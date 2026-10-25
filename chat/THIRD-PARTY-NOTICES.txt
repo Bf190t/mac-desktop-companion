@@ -1,0 +1,157 @@
+Desktop Companion downloads these optional components only on user request.
+They are not covered by the project's MIT license; their original licenses apply.
+
+Python runtime: CPython 3.12.15, distributed by astral-sh/python-build-standalone.
+Release: https://github.com/astral-sh/python-build-standalone/releases/tag/20261021
+Pinned URL, size and SHA-256: runtime-manifest.json.
+The runtime's original CPython and bundled component license files are retained.
+
+The downloaded wheels retain their *.dist-info license/metadata directories.
+Supplemental sentencepiece and tokenizers license texts are supplied in ChatLicenses.
+The model's full Apache-2.0 license is included as MODEL-LICENSE.txt.
+
+Optional local-chat dependencies and upstream sources / 可选本地聊天依赖与来源
+模型：mlx-community/Qwen3-1.7B-4bit，基础模型Qwen/Qwen3-1.7B，Apache-2.0。社区转换与官方基础模型已区分。
+运行库仅安装PyPI预编译wheel，固定版本与sha256见requirements-lock.txt；禁止远程模型代码，运行进程硬禁止网络。
+以下为安装包声明，具体分发须同时保留原始许可证。源码开放和未发现已知漏洞不保证没有后门。
+
+mlx-lm 0.32.2
+https://files.pythonhosted.org/packages/d1/4f/000eefdeb41388782b47e7f39904cf2d9e7e49a60df5e172097c358dba8e/mlx_lm-0.32.2-py3-none-any.whl
+声明许可：MIT
+
+mlx 0.32.4
+https://files.pythonhosted.org/packages/af/44/90bbdc3cdd120e1181f7c4f617ff996530159f2ea3ba3c08b83b08314d21/mlx-0.32.4-cp312-cp312-macosx_26_0_arm64.whl
+声明许可：MIT
+
+psutil 7.1.3
+https://files.pythonhosted.org/packages/68/3a/9f93cff5c025029a36d9a92fef47220ab4692ee7f2be0fba9f92813d0cb8/psutil-7.1.3-cp36-abi3-macosx_11_0_arm64.whl
+声明许可：BSD-3-Clause
+
+mlx-metal 0.32.4
+https://files.pythonhosted.org/packages/2a/d6/4340ed6e184f71693d7f531c9ae55d677451351245760d71f8dd714dcbe5/mlx_metal-0.32.4-py3-none-macosx_26_0_arm64.whl
+声明许可：MIT
+
+transformers 5.20.2
+https://files.pythonhosted.org/packages/96/b6/724faefed06913dd3e42e0476fe2c42448675c42f687a12bf810aa098005/transformers-5.20.2-py3-none-any.whl
+声明许可：Apache 2.0 License
+
+numpy 2.5.4
+https://files.pythonhosted.org/packages/31/2f/5ea3570fcb8ccd0882bea99436a513b2c85dad8f774a2057849130a8fb99/numpy-2.5.4-cp312-cp312-macosx_14_0_arm64.whl
+声明许可：BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0
+
+PyYAML 6.0.3
+https://files.pythonhosted.org/packages/89/a0/6cf41a19a1f2f3feab0e9c0b74134aa2ce6849093d5517a0c550fe37a648/pyyaml-6.0.3-cp312-cp312-macosx_11_0_arm64.whl
+声明许可：MIT
+
+Jinja2 3.1.6
+https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
+声明许可：请查安装包许可证文件
+
+protobuf 7.36.2
+https://files.pythonhosted.org/packages/32/72/98342feb672507c8f3a69e34b4fa8961f608edba5c1a48a6f47156d92cb5/protobuf-7.36.2-cp310-abi3-macosx_10_9_universal2.whl
+声明许可：3-Clause BSD License
+
+sentencepiece 0.2.2
+https://files.pythonhosted.org/packages/bd/44/caa9cab5f261a019e2808bc5046152775dc57352ba9cbae7525e9e7a1ed4/sentencepiece-0.2.2-cp312-cp312-macosx_11_0_arm64.whl
+声明许可：Apache-2.0
+
+huggingface_hub 2.3.0
+https://files.pythonhosted.org/packages/c7/89/5f6ef1162d0323f167b6baab04d1b4bd6a946161a8af6d86f622d9d79aa1/huggingface_hub-2.3.0-py3-none-any.whl
+声明许可：Apache-2.0
+
+MarkupSafe 3.0.4
+https://files.pythonhosted.org/packages/a2/f0/d6613774d86fbf6d145751d43c59875e47a6f9f17daee0aef173bd36d90e/markupsafe-3.0.4-cp312-cp312-macosx_11_0_arm64.whl
+声明许可：BSD-3-Clause
+
+packaging 26.3
+https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
+声明许可：Apache-2.0 OR BSD-2-Clause
+
+regex 2026.9.29
+https://files.pythonhosted.org/packages/37/14/f3f0ba083d2094392d5eabf56db5ea6ba469fd6e927afd187042054ea68a/regex-2026.9.29-cp312-cp312-macosx_11_0_arm64.whl
+声明许可：Apache-2.0 AND CNRI-Python
+
+safetensors 0.8.0
+https://files.pythonhosted.org/packages/f5/b1/fa7c600e7dceae12e9606c7578cbc9ff1e1ed55844883ee5c92205e86226/safetensors-0.8.0-cp310-abi3-macosx_11_0_arm64.whl
+声明许可：请查安装包许可证文件
+
+tokenizers 0.23.3
+https://files.pythonhosted.org/packages/b2/72/01e49f032bb346e5aaf06c10c74fe8aeec847173adbadd66eb7c53054bf2/tokenizers-0.23.3-cp310-abi3-macosx_11_0_arm64.whl
+声明许可：请查安装包许可证文件
+
+tqdm 4.70.1
+https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl
+声明许可：MPL-2.0 AND MIT
+
+typer 0.27.3
+https://files.pythonhosted.org/packages/07/ea/2e31b67051e91a133189e9c000c222502ddc6969856416de0d095de4c0b0/typer-0.27.3-py3-none-any.whl
+声明许可：MIT
+
+annotated-doc 0.0.5
+https://files.pythonhosted.org/packages/3e/30/e900b21425a860e195f32e37657aa1f7c7f2b1bfb26f03ca209b90933c06/annotated_doc-0.0.5-py3-none-any.whl
+声明许可：MIT
+
+click 8.5.0
+https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl
+声明许可：BSD-3-Clause
+
+filelock 4.2.4
+https://files.pythonhosted.org/packages/e0/1b/5e74289a1878e666bb4b65fe5805a04cafcac2aa5f519ef1ead67ef91c56/filelock-4.2.4-py3-none-any.whl
+声明许可：MIT
+
+fsspec 2026.9.0
+https://files.pythonhosted.org/packages/6c/c0/a98505f18594f1bce828bb159cec0fcf9860562f1a2c85913409fc8f3d9e/fsspec-2026.9.0-py3-none-any.whl
+声明许可：BSD-3-Clause
+
+hf-xet 1.7.0
+https://files.pythonhosted.org/packages/c3/47/a26ebdce7056a61e931f228439bc0ab08cbec239d1690f965e5e637cba79/hf_xet-1.7.0-cp38-abi3-macosx_11_0_arm64.whl
+声明许可：Apache-2.0
+
+httpx2 2.16.0
+https://files.pythonhosted.org/packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl
+声明许可：BSD-3-Clause
+
+httpcore2 2.16.0
+https://files.pythonhosted.org/packages/af/c2/ce417c397afa5181f0e3c6ff01a4d01639414e1adef08730d97571297151/httpcore2-2.16.0-py3-none-any.whl
+声明许可：BSD-3-Clause
+
+rich 15.0.0
+https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl
+声明许可：MIT
+
+shellingham 1.5.4
+https://files.pythonhosted.org/packages/e0/f9/0595336914c5619e5f28a1fb793285925a8cd4b432c9da0a987836c7f822/shellingham-1.5.4-py2.py3-none-any.whl
+声明许可：ISC License
+
+typing_extensions 4.16.0
+https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl
+声明许可：PSF-2.0
+
+anyio 4.15.1
+https://files.pythonhosted.org/packages/12/b8/4bd346e22b28902df4d651910f5242c28d84e4a5c2435ca5c3f797ed7e2e/anyio-4.15.1-py3-none-any.whl
+声明许可：MIT
+
+idna 3.20
+https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl
+声明许可：BSD-3-Clause
+
+markdown-it-py 4.2.0
+https://files.pythonhosted.org/packages/b3/81/4da04ced5a082363ecfa159c010d200ecbd959ae410c10c0264a38cac0f5/markdown_it_py-4.2.0-py3-none-any.whl
+声明许可：请查安装包许可证文件
+
+Pygments 2.21.0
+https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl
+声明许可：BSD-2-Clause
+
+truststore 0.10.5
+https://files.pythonhosted.org/packages/51/e9/3a7820be2bb0fe53b6bc9c3be26d3d1158004e4c3ab953aa6840b955b1e9/truststore-0.10.5-py3-none-any.whl
+声明许可：MIT
+
+h11 0.16.0
+https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl
+声明许可：MIT
+
+mdurl 0.1.2
+https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl
+声明许可：请查安装包许可证文件
+

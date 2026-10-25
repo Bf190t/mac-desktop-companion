@@ -1,0 +1,9 @@
+本目录补充两份安装包未附带的上游许可证全文：
+
+tokenizers 0.23.3：Apache License 2.0，Hugging Face 官方仓库 v0.23.3。
+sentencepiece 0.2.2：Apache License 2.0，Google 官方仓库 v0.2.2。
+
+版本、来源提交、精确链接及本地文件 SHA-256 记录于 SOURCES.json。
+原始正文按上游保存；其余依赖许可证保留在 Chat/deps 对应 dist-info 目录，Python 许可证位于 Chat/python-base/lib/python3.12/LICENSE.txt，模型许可证位于 Chat/MODEL-LICENSE.txt。
+
+这里只补充已确认缺失的许可证，不代表完整的法律审查或安全审计，也不能保证依赖绝无后门。没有因此安装或升级任何依赖。

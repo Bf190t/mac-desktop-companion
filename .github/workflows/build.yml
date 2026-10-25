@@ -1,0 +1,50 @@
+name: Build and verify
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Audit public source
+        run: python3 scripts/audit_release.py --mode source .
+      - name: Build lightweight application
+        run: ./scripts/build.sh
+      - name: Headless regression tests
+        run: ./scripts/test.sh
+      - name: Package
+        run: ./scripts/package.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Desktop-Companion-${{ matrix.os }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          retention-days: 14
+  release:
+    if: github.event_name == 'release'
+    needs: check
+    runs-on: macos-26
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: ./scripts/build.sh && ./scripts/package.sh
+      - name: Upload verified package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/*.zip dist/*.sha256

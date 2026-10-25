@@ -1,0 +1,301 @@
+import AppKit
+
+/// Language is local to this app's preferences, independent of other editions.
+enum Language: String, CaseIterable {
+    case chinese = "zh-Hans", english = "en"
+    static var defaults: UserDefaults = .standard
+    static var current: Language {
+        get {
+            if let value=defaults.string(forKey:"interfaceLanguage"),let result=Language(rawValue:value) {return result}
+            return Locale.preferredLanguages.first?.hasPrefix("zh") == true ? .chinese:.english
+        }
+        set {defaults.set(newValue.rawValue,forKey:"interfaceLanguage")}
+    }
+}
+
+func L(_ chinese:String,_ english:String)->String {
+    Localizer.register(chinese,english)
+    return Language.current == .english ? english:chinese
+}
+
+enum Localizer {
+    private static let translations:[String:String] = [
+        " 为避免重复运行，本次已停止。": " Startup stopped to avoid duplicate instances.",
+        "%.0f 秒": "%.0f sec",
+        "Apple 蓝牙设备": "Apple Bluetooth device",
+        "Apple 蓝牙配件": "Apple Bluetooth accessory",
+        "CPU 占用": "CPU usage",
+        "CPU温度暂不可读": "CPU temperature unavailable",
+        "GPU 占用": "GPU usage",
+        "GPU传感器温度": "GPU sensor temperature",
+        "GPU占用": "GPU usage",
+        "GPU占用（多卡最高值）": "GPU usage (highest across GPUs)",
+        "Qwen3 1.7B · 文字聊天 · 不读取电脑状态、不执行电脑操作 · 语音从设置单独开启，无唤醒监听": "Qwen3 1.7B · Text chat · No computer readings or actions · Voice is enabled separately; no wake-word listening",
+        "\n\n耳机请在日常使用时打开充电盒或佩戴，\n待 macOS 更新电量后再刷新。\n本应用不会扫描或主动连接设备。": "\n\nUse your headphones or open the charging case normally,\nthen refresh after macOS updates the battery record.\nThis app never scans or connects to devices.",
+        "一次最多30秒；仅采纳最终识别结果。转写保留在此处，关闭窗口不清空。聊天与脚边输入、模型调试共用上下文。隐藏角色、锁屏或退出会停止语音。": "Record up to 30 seconds. Only final transcripts are used. Closing keeps this draft. Chat context is shared with the companion. Hiding, locking, or quitting stops voice.",
+        "不用一直赶路。\n稍微休息一下也没关系。": "No need to rush.\nIt's okay to take a short break.",
+        "仅统计最近一小时内有效时段；锁屏、休眠缺口不补样本": "Observed periods within the past hour only; lock and sleep gaps are excluded",
+        "今天也慢慢来。\n我会在这里陪着你。": "One small step at a time.\nI'll keep you company.",
+        "休息一小会儿吧。\n我会安静待着。": "Take a little break.\nI'll wait here quietly.",
+        "你": "You",
+        "使用说明": "Help",
+        "使用说明与限制…": "Help & limitations…",
+        "保存并开始新对话": "Save & start new chat",
+        "修改角色语气，不训练模型。保存会开始新对话；短回复、无电脑状态及无操作能力的边界仍保留。限1500字。": "Changes the voice of the character, not model training. Saving starts a new conversation. Short replies and no computer-reading/action abilities remain enforced. Up to 1,500 characters.",
+        "停止回复": "Stop reply",
+        "停止朗读": "Stop reading",
+        "充电盒": "Case",
+        "先在语音实验中开启；按住说话，松开后确认文字再发送": "Enable the voice experiment first. Hold to talk, then review the transcript before sending.",
+        "先安静待一会儿。\n报时开关仍独立保留。": "Let's stay quiet for a moment.\nHourly announcements keep their own setting.",
+        "全屏八向": "All directions",
+        "全选": "Select All",
+        "刷新存储": "Refresh storage",
+        "刷新电量": "Refresh battery",
+        "剪切": "Cut",
+        "单实例标识或锁目录不合法。": "Invalid instance identifier or lock directory.",
+        "单实例锁文件的类型、所有者或权限不正确。": "Unexpected file type, owner or permissions on the instance lock file.",
+        "单实例锁目录的所有者或权限不正确。": "Unexpected owner or permissions on the instance lock directory.",
+        "卸载模型": "Unload model",
+        "发送": "Send",
+        "发送消息": "Send message",
+        "发送给角色": "Send to Mochi",
+        "发送；回复过程中点击可停止": "Send; click while generating to stop the reply",
+        "取消录音 / 转写": "Cancel recording / transcription",
+        "只在按住时使用麦克风；松开后用系统离线中文识别。首次使用先完成权限确认，再按住一次。没有持续监听或唤醒词，不回退云端。": "The microphone runs only while you hold the button. Transcription uses offline Chinese recognition. On first use, grant permissions, then hold again. No wake word, continuous listening, or cloud fallback.",
+        "右耳": "Right",
+        "同时使用系统中文语音（默认关闭）": "Also use the system Chinese voice (off by default)",
+        "启动卷可用空间（可能含可清理空间）": "Available on startup volume (may include purgeable space)",
+        "嗯，小团在这里。\n今天也慢慢来。": "Mochi is here.\nOne small step at a time.",
+        "嗯，我在。\n要看电脑状态，可以点菜单栏的「✿」。": "I'm here.\nComputer readings live under ✿ in the menu bar.",
+        "嗯，继续陪你。": "I'm here with you.",
+        "回车发送 · Shift＋回车换行 · 退出即清空聊天；关闭本窗口不影响脚边聊天。": "Enter sends · Shift+Enter adds a line · Quitting clears chat; closing this window keeps companion chat available.",
+        "圆一点，也能好好陪你。\n要看电脑状态，就点菜单栏「✿」。": "A little round friend for your desktop.\nComputer readings live under ✿ in the menu bar.",
+        "复制": "Copy",
+        "存储可用": "Available storage",
+        "安静地陪在桌面上": "A quiet friend on your desktop",
+        "完全退出": "Quit",
+        "完全退出桌面伴伴": "Quit Desktop Companion",
+        "实验：小团散步": "Experiment: Mochi roaming",
+        "实验：小团散步（每次启动默认关闭）": "Experiment: Mochi roaming (off at each launch)",
+        "实验：长驻留 30 分钟（适合插电的 Mac mini）": "Experiment: keep loaded for 30 min (for plugged-in Macs)",
+        "容量读取失败 · 保留上次读数": "Storage reading failed · Keeping the last value",
+        "小团 · 原立绘": "Mochi · Original companion",
+        "小团 · 圆团子": "Mochi · Original companion",
+        "小团": "Mochi",
+        "小团·小团（实验）": "Mochi · Original companion",
+        "小团小跳（默认关闭）": "Occasional hops (off by default)",
+        "小团小跳：偶尔跳一下（默认关闭）": "Occasional hops (off by default)",
+        "尚未读取": "Not read yet",
+        "左耳": "Left",
+        "已暂停读取 · 解锁或唤醒后恢复": "Reading paused · Resumes after unlock or wake",
+        "已暂停采样 · 解锁或唤醒后恢复": "Sampling paused · Resumes after unlock or wake",
+        "已达到 30 秒上限，正在本机转写…": "The 30-second limit was reached. Transcribing locally…",
+        "应用退出": "App exit",
+        "开启后约每 1–2 分钟轻轻跳一下": "When enabled, a small hop every 1–2 minutes",
+        "开启语音实验（默认关闭）": "Enable voice experiment (off by default)",
+        "当前内存压力": "Memory pressure",
+        "当前应用缺少语音权限说明，未开启录音。请使用完整安装包。": "This app is missing voice permission descriptions. Use the complete app package.",
+        "当前角色": "Character",
+        "性格提示词…": "Personality prompt…",
+        "恢复默认": "Restore default",
+        "想换个位置的话，\n直接拖动我就好。": "To change my spot,\njust drag me over.",
+        "想换个位置的话，\n轻轻拖动我就好。": "To move me,\njust give me a gentle drag.",
+        "我在这里。\n点我说句话，拖动能换位置。\n设置在菜单栏的「✿」。": "I'm here.\nClick to chat or drag to move me.\nFind settings under ✿ in the menu bar.",
+        "打开本页时读取 · 约每分钟更新": "Reads while open · Updates about once a minute",
+        "打开蓝牙电量页后读取": "Open the Bluetooth page to read battery records",
+        "报时时段": "Active hours",
+        "按住说话": "Hold to talk",
+        "按住说话，松开后转写；确认文字后再发送。": "Hold to talk, then review the transcript before sending.",
+        "按住说话；键盘激活可开始或结束": "Hold to talk. Keyboard activation starts or stops recording.",
+        "授权结束后请再次按住说话。": "After granting permission, hold to talk again.",
+        "放大至当前桌面；再次点击恢复原大小": "Fill the current desktop; click again to restore",
+        "散步时暂停语音输入。": "Voice input pauses during roaming.",
+        "散步时暂时隐藏": "Hidden while roaming",
+        "散步范围": "Roam area",
+        "整点气泡报时": "Hourly time bubble",
+        "整点用角色气泡报时": "Hourly time bubble",
+        "无法写入单实例锁记录。": "Cannot write the instance lock record.",
+        "无法创建单实例锁目录。": "Cannot create the instance lock directory.",
+        "无法启动麦克风。请检查输入设备和权限，仍可打字聊天。": "Cannot start the microphone. Check your input device and permissions, or continue typing.",
+        "无法安全打开单实例锁目录。": "Cannot securely open the instance lock directory.",
+        "无法更新单实例锁记录。": "Cannot update the instance lock record.",
+        "无法获取单实例锁。": "Cannot acquire the instance lock.",
+        "显示桌宠": "Show companion",
+        "显示脚边输入框": "Show foot-level input",
+        "暂不可读": "Unavailable",
+        "暂停动作": "Pause motion",
+        "暂无系统可用电量；设备休眠或系统限制时可能无法读取": "No battery record available; sleeping devices or system restrictions may limit access",
+        "暂时无法发送": "Sending is temporarily unavailable",
+        "有效观察": "Observed time",
+        "朗读已停止。": "Reading stopped.",
+        "朗读已到时停止。": "Reading stopped at the time limit.",
+        "朗读结束。可继续打字或按住说话。": "Reading finished. You can type or hold to talk again.",
+        "朗读聊天回复": "Read chat replies aloud",
+        "未找到可用麦克风。仍可打字聊天。": "No microphone found. You can still type.",
+        "未提供读数": "No reading",
+        "未知": "Unknown",
+        "未获语音识别权限。请在系统设置的隐私与安全性中检查，或继续打字。": "Speech recognition permission was not granted. Check System Settings → Privacy & Security, or continue typing.",
+        "未获麦克风权限。可在系统设置的隐私与安全性中开启，或继续打字。": "Microphone permission was not granted. Enable it in System Settings → Privacy & Security, or continue typing.",
+        "本地模型 · 状态与调试": "Local model · Status & debugging",
+        "本地模型状态与调试…": "Local model status & debugging…",
+        "本地聊天与模型设置…": "Local chat & model settings…",
+        "本地聊天，和角色共用一段对话": "Local chat, shared with your companion",
+        "本地转写等待超时，已停止。请重试或继续打字。": "Local transcription timed out and stopped. Try again or continue typing.",
+        "本次没有重复启动。若要切换新版，请先从旧版菜单栏「✿」选择“完全退出”，再打开这个版本。": "A second copy was not started. Quit Desktop Companion from the ✿ menu before opening another version.",
+        "权限已就绪。请再次按住说话，或点击示例转写。": "Permissions are ready. Hold to talk again.",
+        "桌宠已经在运行": "Companion is already running",
+        "桌宠暂未启动": "Companion could not start",
+        "桌宠素材缺失": "Companion artwork is unavailable",
+        "桌宠，点击对话，拖动位置，右键打开菜单": " companion. Click to chat, drag to move, right-click for menu.",
+        "桌面伴伴 · ": "Desktop Companion · ",
+        "桌面伴伴 · 0.1.0 开源版": "Desktop Companion · 0.1.0 Open source",
+        "桌面伴伴 · 本地实验版": "Desktop Companion · Open source",
+        "桌面伴伴 · 设置": "Desktop Companion · Settings",
+        "桌面伴伴": "Desktop Companion",
+        "桌面伴伴，点击对话，拖动位置，右键打开菜单": "Mochi companion. Click to chat, drag to move, right-click for menu.",
+        "模型检查聊天记录": "Model inspector chat history",
+        "模型检查输入消息": "Model inspector message input",
+        "横向溜达": "Horizontal stroll",
+        "正在录音 · 松开转写": "Recording · Release to transcribe",
+        "正在想… · 点击方块停止": "Thinking… · Click the square to stop",
+        "正在本机转写…完成后请检查文字再发送。": "Transcribing locally… Review the result before sending.",
+        "正在本机转写测试音频；麦克风未开启。": "Transcribing a local test file. The microphone is off.",
+        "正在用系统中文声音朗读…": "Reading with the system Chinese voice…",
+        "正在聆听…松开后转写，最长 30 秒。": "Listening… Release to transcribe. Up to 30 seconds.",
+        "正在转写…": "Transcribing…",
+        "正常": "Normal",
+        "没有识别到有效文字，请重试或打字。": "No usable speech was recognized. Try again or type instead.",
+        "测试只接受本地音频文件。": "Tests accept local audio files only.",
+        "测试音频无法读取。": "Cannot read the test audio.",
+        "测试音频需为 0–30 秒。": "Test audio must be 0–30 seconds long.",
+        "清空对话": "Clear chat",
+        "温度": "Temperature",
+        "热压力严重": "Critical thermal pressure",
+        "热压力较高": "High thermal pressure",
+        "状态小窗": "Computer & Bluetooth",
+        "理": "✿",
+        "生成中的草稿（尚未作为气泡发布）\n": "Draft reply (not yet shown as a bubble)\n",
+        "电脑": "Computer",
+        "电脑状态小窗": "Computer status",
+        "电量": "Battery",
+        "知道了": "Got it",
+        "离线缓存，电量可能过期": "Offline cache; battery values may be stale",
+        "离线（系统旧记录）": "Offline (older system record)",
+        "空闲物理内存": "Free physical RAM",
+        "空闲物理内存（不含可回收缓存）": "Free physical RAM (excludes reclaimable caches)",
+        "窗口打开时更新 · 无历史曲线": "Updates while open · No history graphs",
+        "窗口打开时约 5 秒更新 · 无历史曲线": "Updates about every 5 seconds while open · No graphs",
+        "立绘待机动作（小团默认静止）": "Idle motion (Mochi stays still by default)",
+        "粘贴": "Paste",
+        "系统 HID 最近记录；采样时间未知": "Latest HID record; sample time unknown",
+        "系统已登记（连接未核实）": "Registered by macOS (connection unverified)",
+        "系统暂停": "System pause",
+        "系统最近记录；采样时间未知，未列出部件暂无读数": "Latest system record; sample time unknown. Missing parts have no reading.",
+        "系统未提供电量": "No battery value from macOS",
+        "系统没有可用的中文朗读声音，仍会显示文字；本应用不会自动下载声音。": "No Chinese system voice is available. Text will still be shown; this app does not download voices automatically.",
+        "系统电量记录 · 不主动连接设备": "System battery records · Never connects to devices",
+        "红": "Red",
+        "统计中 · 尚无有效观察时长": "Measuring · No observed duration yet",
+        "统计中": "Measuring",
+        "继续动作": "Resume motion",
+        "绿": "Green",
+        "编辑": "Edit",
+        "耳机": "Headphones",
+        "聊一句 · 回车发送": "Say something · Enter to send",
+        "脚边聊天已关闭。": "Foot-level chat is off.",
+        "脚边聊天（散步时暂时隐藏）": "Foot-level chat (hidden while roaming)",
+        "至": "to",
+        "节能中 · 窗口打开时约 15 秒更新": "Energy saving · Updates about every 15 seconds while open",
+        "蓝牙电量": "Bluetooth",
+        "蓝牙设备电量": "Bluetooth battery",
+        "蓝牙配件": "Bluetooth accessory",
+        "角色": "Mochi",
+        "角色、大小与报时…": "Character, size & time…",
+        "角色大小": "Character size",
+        "角色性格提示词": "Companion personality prompt",
+        "角色正在想… 可在模型状态窗口停止回复。": "Mochi is thinking… Stop the reply in the model window.",
+        "角色聊天输入": "Companion chat input",
+        "角色脚边聊天": "Foot-level chat",
+        "角色脚边输入消息": "Message the companion",
+        "触控板": "Trackpad",
+        "设置…": "Settings…",
+        "识别文字后，可在下方修改，再点发送。": "Review and edit the transcript below, then send it.",
+        "试一下报时气泡": "Preview time bubble",
+        "试跳一下": "Try a hop",
+        "试转写示例（不录音）": "Transcribe a sample (no recording)",
+        "语音功能已关闭。": "Voice is off.",
+        "语音实验 · 按住说话与朗读": "Voice experiment · Push to talk & read aloud",
+        "语音实验…": "Voice experiment…",
+        "语音实验确认文字": "Review voice transcript",
+        "语音实验：按住说话与朗读…": "Voice experiment: talk & read…",
+        "语音已随当前状态暂停；恢复后需手动开始。": "Voice paused with the current app state. Start again manually when ready.",
+        "语音识别权限未开启。请在系统设置的隐私与安全性中检查，或继续打字。": "Speech recognition permission is off. Check System Settings → Privacy & Security, or continue typing.",
+        "语音输入已取消。": "Voice input cancelled.",
+        "说完，确认，再发送": "Speak, review, then send",
+        "请保留1–1500字的性格设定": "Please enter a personality prompt of 1–1,500 characters",
+        "请确认系统权限；授权后需再次按住说话。": "Please confirm system permissions, then hold to talk again.",
+        "请重新解压完整的桌面伴伴.app。": "Please extract the complete Desktop Companion.app again.",
+        "读取于 ": "Read at ",
+        "转写已填入输入框，请检查后发送。": "The transcript is in the input box. Review it before sending.",
+        "轻度升温": "Warm",
+        "轻微待机动作": "Subtle idle motion",
+        "轻微待机：眨眼，点击时轻微呼吸": "Subtle idle: blinking and a soft breath on click",
+        "这个角色的素材没有完整加载。\n请重新解压应用再试。": "The character could not be loaded.\nPlease extract the application again.",
+        "这台 Mac 当前无法使用本地中文识别。不会切换到联网识别，请继续打字。": "Offline Chinese recognition is unavailable on this Mac. No cloud fallback will be used; continue typing.",
+        "这是报时气泡示例。\n整点时，我会在这里告诉你时间。": "This is a time-bubble preview.\nAt the hour, I'll show the time here.",
+        "这是报时示例。": "This is a time announcement preview.",
+        "连接状态未核实": "Connection unverified",
+        "选择角色": "Choose character",
+        "重置桌宠位置": "Reset companion position",
+        "键盘": "Keyboard",
+        "隐藏、锁屏或休眠时不报时，恢复后不补报。\n低电量或热压力升高时自动暂停动作。存储每小时刷新。": "No announcements while hidden, locked, or asleep; none are replayed.\nMotion pauses for low power or heat. Storage updates hourly.",
+        "隐藏桌宠": "Hide companion",
+        "音频输入设备发生变化，录音已停止。请重新按住说话。": "The audio input device changed. Recording stopped; hold to talk again.",
+        "麦克风当前不可用。请检查输入设备，仍可打字聊天。": "The microphone is unavailable. Check your input device or continue typing.",
+        "麦克风权限未开启。请在系统设置的隐私与安全性中检查，或继续打字。": "Microphone permission is off. Check System Settings → Privacy & Security, or continue typing.",
+        "黄": "Yellow",
+        "默认不自启、不联网；完全退出可从菜单栏操作。": "No auto-start or background network use. Quit from the menu bar.",
+        "默认闲置120秒后释放；长驻留仍受内存压力、锁屏、熄屏和退出限制。内存为推理进程系统计账值，CPU 100%约为一核，不代表耗电。": "Unloads after 120 seconds idle. Longer residency still stops for memory pressure, lock, display sleep, and exit. Memory is process-accounted usage; CPU 100% is roughly one core, not a power reading.",
+        "鼠标": "Mouse",
+        "鼠标会穿过我。\n在菜单栏「✿」里可以关闭。": "Clicks pass through me now.\nTurn this off under ✿ in the menu bar.",
+        "鼠标穿透": "Click-through",
+        "鼠标穿透（从菜单栏关闭）": "Click-through (turn off from menu bar)",
+        "鼠标穿透（散步时自动开启）": "Click-through (on while roaming)",
+        "（未完成，不用于后续对话）": "(Incomplete; excluded from future context)",
+    ]
+    private static let lock=NSLock()
+    private static var recent:[String:String]=[:]
+    private static var order:[String]=[]
+    // Retain a bounded set of current dynamic messages for live language changes.
+    // All static UI strings remain in the catalog above without time-based work.
+    static func register(_ chinese:String,_ english:String) {
+        guard translations[chinese] == nil else{return}
+        lock.lock();defer{lock.unlock()}
+        if recent[chinese] == nil {order.append(chinese)}
+        recent[chinese]=english
+        if order.count>512 {recent.removeValue(forKey:order.removeFirst())}
+    }
+    static func text(_ value:String)->String {
+        lock.lock();let copy=recent;lock.unlock()
+        if Language.current == .english { return translations[value] ?? copy[value] ?? value }
+        return translations.first(where:{$0.value == value})?.key ?? copy.first(where:{$0.value == value})?.key ?? value
+    }
+    /// Re-label existing controls without losing edited text or conversation.
+    static func localize(_ view:NSView) {
+        if let popup=view as? NSPopUpButton {for item in popup.itemArray {item.title=text(item.title)}}
+        else if let button=view as? NSButton {button.title=text(button.title)}
+        else if let label=view as? NSTextField,!label.isEditable {label.stringValue=text(label.stringValue)}
+        if let segmented=view as? NSSegmentedControl {for i in 0..<segmented.segmentCount {if let title=segmented.label(forSegment:i){segmented.setLabel(text(title),forSegment:i)}}}
+        if let tooltip=view.toolTip {view.toolTip=text(tooltip)}
+        if let description=view.accessibilityLabel() {view.setAccessibilityLabel(text(description))}
+        for child in view.subviews {localize(child)}
+    }
+    static func localize(_ menu:NSMenu) {
+        menu.title=text(menu.title)
+        for item in menu.items {item.title=text(item.title);if let sub=item.submenu{localize(sub)}}
+    }
+    static func localize(_ window:NSWindow) {
+        window.title=text(window.title)
+        if let content=window.contentView {localize(content)}
+    }
+}
