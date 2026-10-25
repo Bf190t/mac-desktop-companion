@@ -1,0 +1,31 @@
+{
+  "verified_date": "2026-10-25",
+  "purpose": "Upstream license bodies omitted by the installed Python wheels. These copies supplement the distribution metadata and preserved dependency licenses in Chat/deps.",
+  "packages": [
+    {
+      "package": "tokenizers",
+      "installed_version": "0.23.3",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/huggingface/tokenizers",
+      "tag": "v0.23.3",
+      "commit": "301277072263fb3830eb66eec7e47adadf76f1dc",
+      "source": "https://github.com/huggingface/tokenizers/blob/301277072263fb3830eb66eec7e47adadf76f1dc/LICENSE",
+      "local_file": "tokenizers-0.23.3-LICENSE.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "verification": "Version confirmed in installed METADATA and upstream release list. GitHub reports the annotated v0.23.3 tag signature verified. The LICENSE content was fetched from that tag."
+    },
+    {
+      "package": "sentencepiece",
+      "installed_version": "0.2.2",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/google/sentencepiece",
+      "tag": "v0.2.2",
+      "commit": "e0cce7d37b065b5140349dbe12c6bcf6192fdd78",
+      "source": "https://github.com/google/sentencepiece/blob/e0cce7d37b065b5140349dbe12c6bcf6192fdd78/LICENSE",
+      "local_file": "sentencepiece-0.2.2-LICENSE.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "verification": "Version confirmed in installed METADATA and upstream release list. The v0.2.2 tag points directly to the recorded commit. The LICENSE content was fetched from that tag."
+    }
+  ],
+  "limits": "License and source verification is not a complete security audit, endorsement, or guarantee against malicious code. No dependency was installed or upgraded during this check."
+}

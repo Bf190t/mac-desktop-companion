@@ -1,0 +1,89 @@
+{
+  "repo": "mlx-community/Qwen3-1.7B-4bit",
+  "revision": "3b1b1768f8f8cf8351c712464f906e86c2b8269e",
+  "base_model": "Qwen/Qwen3-1.7B",
+  "format": "safetensors",
+  "files": [
+    {
+      "name": "README.md",
+      "bytes": 873,
+      "sha256": "26afc7609fa8dce8a0763b115ce95017763e45c0aaa92ac38911363f4fc1c16b",
+      "upstream_sha256": null,
+      "upstream_git_blob": "c091c6a52b254dd7954cf9bde247650b1f0b895b",
+      "verified": true
+    },
+    {
+      "name": "added_tokens.json",
+      "bytes": 707,
+      "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680",
+      "upstream_sha256": null,
+      "upstream_git_blob": "b54f9135e44c1e81047e8d05cb027af8bc039eed",
+      "verified": true
+    },
+    {
+      "name": "config.json",
+      "bytes": 937,
+      "sha256": "507a6701220524eb8b283425bf0856a9ae4f21f4052e563896ddd668994b1dc7",
+      "upstream_sha256": null,
+      "upstream_git_blob": "0a78ffc3980b062021a450199988d0ed8537239d",
+      "verified": true
+    },
+    {
+      "name": "merges.txt",
+      "bytes": 1671853,
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "upstream_sha256": null,
+      "upstream_git_blob": "31349551d90c7606f325fe0f11bbb8bd5fa0d7c7",
+      "verified": true
+    },
+    {
+      "name": "model.safetensors",
+      "bytes": 968080210,
+      "sha256": "0e86d9677e519323849eac1bc272caae88567a481ff188c431f70be543d9995f",
+      "upstream_sha256": "0e86d9677e519323849eac1bc272caae88567a481ff188c431f70be543d9995f",
+      "upstream_git_blob": "4a262bc4638b8187b503c46579aca0c8b820f4e2",
+      "verified": true
+    },
+    {
+      "name": "model.safetensors.index.json",
+      "bytes": 49731,
+      "sha256": "1e3058d4ba4b04e4de35b74467725cbef90ff022198404218e48f21adc9cfa15",
+      "upstream_sha256": null,
+      "upstream_git_blob": "8607d041b6549c15a4db85e7b4c5cf30d3ab890a",
+      "verified": true
+    },
+    {
+      "name": "special_tokens_map.json",
+      "bytes": 613,
+      "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+      "upstream_sha256": null,
+      "upstream_git_blob": "ac23c0aaa2434523c494330aeb79c58395378103",
+      "verified": true
+    },
+    {
+      "name": "tokenizer.json",
+      "bytes": 11422654,
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "upstream_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "upstream_git_blob": "cd71f61a15a522601badb3dc960d800d9cb3766c",
+      "verified": true
+    },
+    {
+      "name": "tokenizer_config.json",
+      "bytes": 9706,
+      "sha256": "253153d0738ceb4c668d2eff957714dd2bea0b56de772a9fdccd96cbf517e6a0",
+      "upstream_sha256": null,
+      "upstream_git_blob": "7345216a0785dc7086e8c245b2a9d3896ce2b756",
+      "verified": true
+    },
+    {
+      "name": "vocab.json",
+      "bytes": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "upstream_sha256": null,
+      "upstream_git_blob": "4783fe10ac3adce15ac8f358ef5462739852c569",
+      "verified": true
+    }
+  ],
+  "total_bytes": 984014117
+}

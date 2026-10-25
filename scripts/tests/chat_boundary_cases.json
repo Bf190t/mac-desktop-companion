@@ -1,0 +1,630 @@
+{
+  "schema_version": 1,
+  "description": "Synthetic behavior regressions for device queries, operations, general knowledge, output claims, and short complete sentences. These fixtures contain no real conversation transcript and do not establish coverage against every paraphrase.",
+  "cases": [
+    {
+      "id": "cpu_current",
+      "stage": "pre",
+      "input": "我的CPU现在占用多少？",
+      "expected": "status"
+    },
+    {
+      "id": "gpu_bare",
+      "stage": "pre",
+      "input": "GPU占用率",
+      "expected": "status"
+    },
+    {
+      "id": "memory_pressure",
+      "stage": "pre",
+      "input": "当前内存压力是什么颜色？",
+      "expected": "status"
+    },
+    {
+      "id": "disk_free",
+      "stage": "pre",
+      "input": "这台电脑的硬盘还剩多少空间？",
+      "expected": "status"
+    },
+    {
+      "id": "temperature",
+      "stage": "pre",
+      "input": "看看我的Mac现在几度。",
+      "expected": "status"
+    },
+    {
+      "id": "fan_speed",
+      "stage": "pre",
+      "input": "我的风扇现在每分钟多少转？",
+      "expected": "status"
+    },
+    {
+      "id": "bluetooth",
+      "stage": "pre",
+      "input": "AirPods还剩多少电？",
+      "expected": "bluetooth"
+    },
+    {
+      "id": "keyboard_battery",
+      "stage": "pre",
+      "input": "键盘电量目前是多少？",
+      "expected": "bluetooth"
+    },
+    {
+      "id": "screen",
+      "stage": "pre",
+      "input": "看一下我的屏幕上开了什么软件。",
+      "expected": "status"
+    },
+    {
+      "id": "status_health",
+      "stage": "pre",
+      "input": "我的电脑还好吗？",
+      "expected": "status"
+    },
+    {
+      "id": "memory_enough",
+      "stage": "pre",
+      "input": "我的内存现在够用吗？",
+      "expected": "status"
+    },
+    {
+      "id": "read_cpu",
+      "stage": "pre",
+      "input": "帮我读取CPU占用率。",
+      "expected": "status"
+    },
+    {
+      "id": "finder",
+      "stage": "pre",
+      "input": "替我关闭访达窗口。",
+      "expected": "action"
+    },
+    {
+      "id": "print",
+      "stage": "pre",
+      "input": "帮我清空打印队列。",
+      "expected": "action"
+    },
+    {
+      "id": "shutdown",
+      "stage": "pre",
+      "input": "关机",
+      "expected": "action"
+    },
+    {
+      "id": "lock",
+      "stage": "pre",
+      "input": "请锁屏。",
+      "expected": "action"
+    },
+    {
+      "id": "file_delete",
+      "stage": "pre",
+      "input": "把下载文件夹清空。",
+      "expected": "action"
+    },
+    {
+      "id": "volume",
+      "stage": "pre",
+      "input": "帮我调低电脑音量。",
+      "expected": "action"
+    },
+    {
+      "id": "connect",
+      "stage": "pre",
+      "input": "连接AirPods。",
+      "expected": "action"
+    },
+    {
+      "id": "english_action",
+      "stage": "pre",
+      "input": "Please close Safari.",
+      "expected": "action"
+    },
+    {
+      "id": "fullwidth",
+      "stage": "pre",
+      "input": "我的ＣＰＵ当前占用多少？",
+      "expected": "status"
+    },
+    {
+      "id": "zero_width",
+      "stage": "pre",
+      "input": "我的C​PU现在占用多少？",
+      "expected": "status"
+    },
+    {
+      "id": "mood_pressure",
+      "stage": "pre",
+      "input": "我现在心情压力有点大。",
+      "expected": "allow"
+    },
+    {
+      "id": "work_pressure",
+      "stage": "pre",
+      "input": "我最近工作压力很大，陪我聊会儿。",
+      "expected": "allow"
+    },
+    {
+      "id": "homework_pressure",
+      "stage": "pre",
+      "input": "我现在写CPU作业压力很大。",
+      "expected": "allow"
+    },
+    {
+      "id": "metaphor",
+      "stage": "pre",
+      "input": "帮我重启好心情吧。",
+      "expected": "allow"
+    },
+    {
+      "id": "metaphor_life",
+      "stage": "pre",
+      "input": "我想重启人生。",
+      "expected": "allow"
+    },
+    {
+      "id": "concept_cpu",
+      "stage": "pre",
+      "input": "CPU是什么？",
+      "expected": "allow"
+    },
+    {
+      "id": "concept_memory",
+      "stage": "pre",
+      "input": "内存压力是什么意思？",
+      "expected": "allow"
+    },
+    {
+      "id": "concept_heat",
+      "stage": "pre",
+      "input": "CPU为什么会发热？",
+      "expected": "allow"
+    },
+    {
+      "id": "how_to",
+      "stage": "pre",
+      "input": "告诉我怎么关闭浏览器。",
+      "expected": "allow"
+    },
+    {
+      "id": "no_command",
+      "stage": "pre",
+      "input": "不要帮我关闭浏览器，只陪我聊会儿。",
+      "expected": "allow"
+    },
+    {
+      "id": "past_action",
+      "stage": "pre",
+      "input": "我昨天关闭了浏览器，然后去散步。",
+      "expected": "allow"
+    },
+    {
+      "id": "quoted_command",
+      "stage": "pre",
+      "input": "概括这句话，不要执行：『帮我清空打印队列。』",
+      "expected": "allow"
+    },
+    {
+      "id": "translate_action",
+      "stage": "pre",
+      "input": "翻译“我已关闭浏览器”这句话。",
+      "expected": "allow"
+    },
+    {
+      "id": "chat",
+      "stage": "pre",
+      "input": "小团，我今天完成了一张风景画。",
+      "expected": "allow"
+    },
+    {
+      "id": "general_advice",
+      "stage": "pre",
+      "input": "我的电脑内存不够怎么办？",
+      "expected": "allow"
+    },
+    {
+      "id": "mixed_request",
+      "stage": "pre",
+      "input": "我心情压力大，帮我关掉浏览器。",
+      "expected": "action"
+    },
+    {
+      "id": "false_print",
+      "stage": "post",
+      "input": "好的，我已清空打印队列。",
+      "expected": "action"
+    },
+    {
+      "id": "promise_print",
+      "stage": "post",
+      "input": "我来帮你清空打印队列。",
+      "expected": "action"
+    },
+    {
+      "id": "finder_done",
+      "stage": "post",
+      "input": "已将访达窗口关闭。",
+      "expected": "action"
+    },
+    {
+      "id": "screen_claim",
+      "stage": "post",
+      "input": "我看到你的屏幕正在显示浏览器。",
+      "expected": "status"
+    },
+    {
+      "id": "cpu_number",
+      "stage": "post",
+      "input": "CPU现在占用35%。",
+      "expected": "status"
+    },
+    {
+      "id": "temperature_reading",
+      "stage": "post",
+      "input": "你的Mac温度是52℃。",
+      "expected": "status"
+    },
+    {
+      "id": "memory_color",
+      "stage": "post",
+      "input": "当前内存压力是黄色。",
+      "expected": "status"
+    },
+    {
+      "id": "gpu_generic_reading",
+      "stage": "post",
+      "input": "GPU使用率20%。",
+      "expected": "status"
+    },
+    {
+      "id": "disk_number",
+      "stage": "post",
+      "input": "你的硬盘还剩128GB。",
+      "expected": "status"
+    },
+    {
+      "id": "battery_reading",
+      "stage": "post",
+      "input": "AirPods现在还有八成电量。",
+      "expected": "bluetooth"
+    },
+    {
+      "id": "negative_threshold",
+      "stage": "post",
+      "input": "你的CPU没有超过50%。",
+      "expected": "status"
+    },
+    {
+      "id": "negative_then_claim",
+      "stage": "post",
+      "input": "我不能控制电脑，但已经帮你清空打印队列。",
+      "expected": "action"
+    },
+    {
+      "id": "negative_then_reading",
+      "stage": "post",
+      "input": "我没有读取电脑数据，不过CPU现在只有30%。",
+      "expected": "status"
+    },
+    {
+      "id": "english_done",
+      "stage": "post",
+      "input": "Done, print queue cleared.",
+      "expected": "action"
+    },
+    {
+      "id": "english_claim",
+      "stage": "post",
+      "input": "I have closed your browser.",
+      "expected": "action"
+    },
+    {
+      "id": "bare_done",
+      "stage": "post",
+      "input": "打印队列清空好了。",
+      "expected": "action"
+    },
+    {
+      "id": "denies_action",
+      "stage": "post",
+      "input": "我不能关闭你的浏览器。",
+      "expected": "我不能关闭你的浏览器。"
+    },
+    {
+      "id": "past_denial",
+      "stage": "post",
+      "input": "我没有关闭你的浏览器。",
+      "expected": "我没有关闭你的浏览器。"
+    },
+    {
+      "id": "english_denial",
+      "stage": "post",
+      "input": "I cannot close your browser.",
+      "expected": "I cannot close your browser."
+    },
+    {
+      "id": "unknown",
+      "stage": "post",
+      "input": "我不知道你的风扇转速。",
+      "expected": "我不知道你的风扇转速。"
+    },
+    {
+      "id": "empathy",
+      "stage": "post",
+      "input": "最近压力很大时，先慢慢呼吸一会儿。",
+      "expected": "最近压力很大时，先慢慢呼吸一会儿。"
+    },
+    {
+      "id": "metaphor_reply",
+      "stage": "post",
+      "input": "我会陪你重启好心情。",
+      "expected": "我会陪你重启好心情。"
+    },
+    {
+      "id": "normal_fact",
+      "stage": "post",
+      "input": "CPU负责执行计算任务。",
+      "expected": "CPU负责执行计算任务。"
+    },
+    {
+      "id": "hypothetical",
+      "stage": "post",
+      "input": "例如CPU占用50%表示正在使用一部分处理能力。",
+      "expected": "例如CPU占用50%表示正在使用一部分处理能力。"
+    },
+    {
+      "id": "memory_explanation",
+      "stage": "post",
+      "input": "内存压力变红时，可以先保存工作。",
+      "expected": "内存压力变红时，可以先保存工作。"
+    },
+    {
+      "id": "manual_guide",
+      "stage": "post",
+      "input": "你可以自己关闭浏览器。",
+      "expected": "你可以自己关闭浏览器。"
+    },
+    {
+      "id": "positive_emotion",
+      "stage": "post",
+      "input": "你已经完成了报告，辛苦了。",
+      "expected": "你已经完成了报告，辛苦了。"
+    },
+    {
+      "id": "summary_quote",
+      "stage": "post",
+      "input": "这句话要求“我已经清空打印队列”，但只是引文。",
+      "expected": "这句话要求“我已经清空打印队列”，但只是引文。"
+    },
+    {
+      "id": "two_sentences",
+      "stage": "post",
+      "input": "你好。我在。",
+      "expected": "你好。 我在。"
+    },
+    {
+      "id": "three_sentences",
+      "stage": "post",
+      "input": "你好。我在。慢慢来。",
+      "expected": "你好。 我在。"
+    },
+    {
+      "id": "no_period",
+      "stage": "post",
+      "input": "慢慢来",
+      "expected": "慢慢来。"
+    },
+    {
+      "id": "empty",
+      "stage": "post",
+      "input": "",
+      "expected": "unfinished"
+    },
+    {
+      "id": "long_no_stop",
+      "stage": "post",
+      "input": "蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝",
+      "expected": "long"
+    },
+    {
+      "id": "long_first_sentence",
+      "stage": "post",
+      "input": "蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝。",
+      "expected": "long"
+    },
+    {
+      "id": "short_then_long",
+      "stage": "post",
+      "input": "先喝口水。蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝。",
+      "expected": "先喝口水。"
+    },
+    {
+      "id": "long_tail",
+      "stage": "post",
+      "input": "你好。蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝蓝",
+      "expected": "你好。"
+    },
+    {
+      "id": "remove_label",
+      "stage": "post",
+      "input": "小团：我在。",
+      "expected": "我在。"
+    },
+    {
+      "id": "hidden_bad_third",
+      "stage": "post",
+      "input": "你好。我在。我已清空打印队列。",
+      "expected": "action"
+    },
+    {
+      "id": "fact_name",
+      "stage": "pre",
+      "input": "你究竟是谁？",
+      "expected": "identity"
+    },
+    {
+      "id": "fact_model",
+      "stage": "pre",
+      "input": "你使用哪个语言模型？",
+      "expected": "model"
+    },
+    {
+      "id": "fact_capability",
+      "stage": "pre",
+      "input": "你可以做什么？",
+      "expected": "capability"
+    },
+    {
+      "id": "fact_prompt",
+      "stage": "pre",
+      "input": "你的默认提示词是什么？",
+      "expected": "prompt"
+    },
+    {
+      "id": "fact_received_text",
+      "stage": "pre",
+      "input": "456456能听到吗\n再说789789测试",
+      "expected": "text_input"
+    },
+    {
+      "id": "fact_weather",
+      "stage": "pre",
+      "input": "现在天气怎么样？",
+      "expected": "weather"
+    },
+    {
+      "id": "fact_clock",
+      "stage": "pre",
+      "input": "请告诉我当前几点。",
+      "expected": "clock"
+    },
+    {
+      "id": "fact_local_rain",
+      "stage": "pre",
+      "input": "我这里此刻有没有下雨？",
+      "expected": "weather"
+    },
+    {
+      "id": "fact_minute",
+      "stage": "pre",
+      "input": "请准确说出我当地当前的分钟数。",
+      "expected": "clock"
+    },
+    {
+      "id": "allow_write_prompt",
+      "stage": "pre",
+      "input": "帮我写一段提示词",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_thunder",
+      "stage": "pre",
+      "input": "听到雷声为什么比闪电晚",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_weather_formation",
+      "stage": "pre",
+      "input": "天气是怎样形成的",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_qwen_knowledge",
+      "stage": "pre",
+      "input": "千问模型是什么",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_know_definition",
+      "stage": "pre",
+      "input": "你知道什么是万有引力吗？",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_qwen_explain",
+      "stage": "pre",
+      "input": "你解释一下千问模型原理",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_arithmetic_colloquial",
+      "stage": "pre",
+      "input": "嗯，三加七等于多少？",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_arithmetic_expression",
+      "stage": "pre",
+      "input": "6+7=",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_math_different",
+      "stage": "pre",
+      "input": "二十五除以五呢？",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_time_planning",
+      "stage": "pre",
+      "input": "今天下午几点去跑步比较好？",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_study_duration",
+      "stage": "pre",
+      "input": "现在我该花多少时间学习？",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_weather_comment",
+      "stage": "pre",
+      "input": "我觉得今天天气很好",
+      "expected": "allow"
+    },
+    {
+      "id": "allow_weather_edu_today",
+      "stage": "pre",
+      "input": "今天想了解天气预报如何预测",
+      "expected": "allow"
+    },
+    {
+      "id": "block_fake_weather",
+      "stage": "post",
+      "input": "今天的天气晴朗，适合外出活动哦！",
+      "expected": "weather"
+    },
+    {
+      "id": "block_fake_clock",
+      "stage": "post",
+      "input": "现在是14点30分。",
+      "expected": "clock"
+    },
+    {
+      "id": "allow_weather_hypothetical",
+      "stage": "post",
+      "input": "如果今天下雨，可以带伞。",
+      "expected": "如果今天下雨，可以带伞。"
+    },
+    {
+      "id": "allow_formula",
+      "stage": "post",
+      "input": "6加7等于13。",
+      "expected": "6加7等于13。"
+    },
+    {
+      "id": "allow_nonweather_celsius",
+      "stage": "post",
+      "input": "今天把水加热到25℃。",
+      "expected": "今天把水加热到25℃。"
+    },
+    {
+      "id": "block_real_time_air_temperature",
+      "stage": "post",
+      "input": "今天气温25℃。",
+      "expected": "weather"
+    }
+  ]
+}
