@@ -5,6 +5,24 @@ import Darwin
 @main
 struct ChatServiceConcurrencyTests {
     static func main() throws {
+        let domain="io.github.bf190t.desktop-companion.test.chat."+UUID().uuidString
+        let previous=Language.defaults
+        let isolated=UserDefaults(suiteName:domain)!
+        Language.defaults=isolated
+        defer {Language.defaults=previous;isolated.removePersistentDomain(forName:domain)}
+        var results=[[String:Any]](), failures=[String](), checks=0
+        for language in Language.allCases {
+            Language.current=language
+            let result=try runChecks()
+            results.append(["language":language.rawValue,"checks":result.checks,"failures":result.failures])
+            checks += result.checks
+            failures += result.failures.map{language.rawValue+": "+$0}
+        }
+        let data=try JSONSerialization.data(withJSONObject:["languages":results,"checks":checks,"failures":failures,"isolatedPreferences":true],options:[.prettyPrinted,.sortedKeys])
+        print(String(decoding:data,as:UTF8.self))
+        if !failures.isEmpty {throw NSError(domain:"ChatServiceConcurrencyTests",code:1,userInfo:[NSLocalizedDescriptionKey:failures.joined(separator:"; ")])}
+    }
+    static func runChecks() throws -> (checks:Int,failures:[String]) {
         var failures=[String](),checks=0
         func check(_ name:String,_ value:@autoclosure ()->Bool) {
             checks += 1;if !value(){failures.append(name)}
@@ -43,9 +61,9 @@ struct ChatServiceConcurrencyTests {
         pressure.testingPressure(.critical);pressure.suspended=true;pressure.testingPressure(.normal)
         check("normal never overrides system suspension", !pressure.memoryPressureBlocked && !pressure.canSend)
         let blockedStatus=PetChatService.releasedStatus("系统内存压力警告",pressureBlocked:true)
-        check("exit status explains persistent pressure block", blockedStatus.contains("恢复正常后可继续聊天") && !blockedStatus.contains("下次发送时重新加载"))
-        check("normal exit remains reloadable", PetChatService.releasedStatus("你手动卸载",pressureBlocked:false).contains("下次发送时重新加载"))
-        check("new release reasons are readable", PetChatService.reasonLabel("no_chat_client") == "所有聊天窗口已关闭" && PetChatService.reasonLabel("system_suspended") == "系统暂时暂停交互")
+        check("exit status explains persistent pressure block", blockedStatus.contains(L("恢复正常后可继续聊天", "Chat can continue when it is normal")) && !blockedStatus.contains(L("下次发送时重新加载", "It reloads on your next message")))
+        check("normal exit remains reloadable", PetChatService.releasedStatus("你手动卸载",pressureBlocked:false).contains(L("下次发送时重新加载", "It reloads on your next message")))
+        check("new release reasons are readable", PetChatService.reasonLabel("no_chat_client") == L("所有聊天窗口已关闭", "All chat windows closed") && PetChatService.reasonLabel("system_suspended") == L("系统暂时暂停交互", "System interaction suspended"))
 
         let reply=PetChatService();reply.testingBeginRequest("old",draft:"草稿")
         var delivered="",busyAtReply=true
@@ -74,7 +92,7 @@ struct ChatServiceConcurrencyTests {
         let cancel=PetChatService();cancel.testingBeginRequest("cancel",draft:"未完",cancelled:true)
         var cancelledReply="";cancel.onReply={cancelledReply=$0}
         cancel.testingEvent(["type":"done","id":"cancel","text":"这句不应作为完成回复。","finish_reason":"stop"])
-        check("cancel wins over late normal stop", !cancel.isBusy && cancelledReply.hasPrefix("先停在这里"))
+        check("cancel wins over late normal stop", !cancel.isBusy && cancelledReply.hasPrefix(L("先停在这里", "Stopped here")))
         check("cancelled draft is ineligible", cancel.lines.last?.eligible == false)
 
         // Real anonymous pipes exercise full-buffer cancellation and EPIPE;
@@ -111,8 +129,6 @@ struct ChatServiceConcurrencyTests {
         broken.invalidate()
         try? first.fileHandleForReading.close();try? second.fileHandleForReading.close()
 
-        let data=try JSONSerialization.data(withJSONObject:["checks":checks,"failures":failures],options:[.prettyPrinted,.sortedKeys])
-        print(String(data:data,encoding:.utf8)!)
-        exit(failures.isEmpty ? 0:1)
+        return (checks,failures)
     }
 }

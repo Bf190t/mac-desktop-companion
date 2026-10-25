@@ -24,8 +24,15 @@ jobs:
         run: ./scripts/build.sh
       - name: Headless regression tests
         run: ./scripts/test.sh
+      - name: Native application smoke test
+        run: |
+          mkdir -p build/native
+          "dist/Desktop Companion.app/Contents/MacOS/DesktopCompanion" --ui-check "$PWD/build/native"
+          python3 -c 'import json; r=json.load(open("build/native/report.json")); assert r["passed"], r["checks"]'
       - name: Package
         run: ./scripts/package.sh
+      - name: Audit distribution archive
+        run: python3 scripts/audit_release.py --mode zip dist/Desktop-Companion-0.1.0-AppleSilicon.zip
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Desktop-Companion-${{ matrix.os }}
