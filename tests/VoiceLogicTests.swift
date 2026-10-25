@@ -2,6 +2,23 @@ import Foundation
 
 @main struct VoiceLogicTests {
     static func main() {
+        let domain="io.github.bf190t.desktop-companion.test.voice."+UUID().uuidString
+        let previous=Language.defaults
+        let isolated=UserDefaults(suiteName:domain)!
+        Language.defaults=isolated
+        defer {Language.defaults=previous;isolated.removePersistentDomain(forName:domain)}
+        var results=[[String:Any]]()
+        for language in Language.allCases {
+            Language.current=language
+            let count=runChecks()
+            results.append(["language":language.rawValue,"passed":count,"failed":0])
+        }
+        let result:[String:Any]=["languages":results,"passed":results.reduce(0){$0+($1["passed"] as! Int)},
+            "failed":0,"isolatedPreferences":true,"microphone_opened":false,"audio_played":false,"real_speech_recognition":false]
+        let data=try! JSONSerialization.data(withJSONObject:result,options:[.prettyPrinted,.sortedKeys])
+        print(String(decoding:data,as:UTF8.self))
+    }
+    static func runChecks()->Int {
         var passed = 0
         func check(_ condition: @autoclosure () -> Bool, _ name: String) {
             guard condition() else { fatalError("FAIL: \(name)") }
@@ -51,7 +68,7 @@ import Foundation
         service.shutdown(reason: "测试取消")
         check(!service.isRecording && !service.isProcessing && !service.isSpeaking, "idle shutdown remains stopped")
         service.enabled = false
-        check(!service.canRecord && service.status == "语音功能已关闭。", "disabling resets visible state")
-        print("{\"passed\":\(passed),\"failed\":0,\"microphone_opened\":false,\"audio_played\":false,\"real_speech_recognition\":false}")
+        check(!service.canRecord && service.status == L("语音功能已关闭。", "Voice is off."), "disabling resets visible state")
+        return passed
     }
 }
