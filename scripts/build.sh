@@ -26,6 +26,11 @@ for file in worker.py model-manifest.json requirements-lock.txt MODEL-LICENSE.tx
 done
 if [[ -d "$project_dir/chat/persona" ]]; then cp -R "$project_dir/chat/persona" "$resources/Chat/"; fi
 if [[ -f "$project_dir/scripts/chat_boundary.py" ]]; then cp "$project_dir/scripts/chat_boundary.py" "$resources/Chat/"; fi
+# Optional reading voice: installer, helper and the companion's designed voice sample (no weights).
+mkdir -p "$resources/Voice"
+for file in tts_worker.py install.py install.sh model-manifest.json runtime-manifest.json requirements-lock.txt MODEL-LICENSE.txt THIRD-PARTY-NOTICES.txt companion_voice.wav companion_voice.json; do
+  cp "$project_dir/voice/$file" "$resources/Voice/$file"
+done
 for file in LICENSE THIRD_PARTY_NOTICES.md; do cp "$project_dir/$file" "$resources/$file"; done
 mkdir -p "$resources/Licenses"
 cp "$project_dir/docs/licenses/Stats-MIT.txt" "$resources/Licenses/Stats-MIT.txt"
@@ -39,15 +44,15 @@ cat > "$bundle/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>Desktop Companion</string>
 <key>CFBundleExecutable</key><string>DesktopCompanion</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.0</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundleVersion</key><string>2</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string></array>
-<key>NSMicrophoneUsageDescription</key><string>Records only while you hold the talk button, to make an editable local transcript.</string>
+<key>NSMicrophoneUsageDescription</key><string>Records only between your click to start and your click to stop, to make an editable transcript on this Mac.</string>
 <key>NSSpeechRecognitionUsageDescription</key><string>Transcribes speech locally when on-device recognition is available; cloud fallback is disabled.</string>
 <key>NSPrincipalClass</key><string>NSApplication</string>
 <key>NSHumanReadableCopyright</key><string>Copyright 2026 Bf190t and contributors. MIT; third-party components retain their own licenses.</string>
@@ -55,7 +60,7 @@ cat > "$bundle/Contents/Info.plist" <<'PLIST'
 PLIST
 mkdir -p "$resources/en.lproj" "$resources/zh-Hans.lproj"
 cat > "$resources/zh-Hans.lproj/InfoPlist.strings" <<'STRINGS'
-"NSMicrophoneUsageDescription" = "仅在按住说话时录音，在本机生成可修改的文字。";
+"NSMicrophoneUsageDescription" = "只在你点一下开始、再点一下停止之间录音，在本机生成可修改的文字。";
 "NSSpeechRecognitionUsageDescription" = "使用本机离线语音识别；不可用时不会回退到云端识别。";
 STRINGS
 "$bundle/Contents/MacOS/DesktopCompanion" --export-icon "$staging/mascot.png"

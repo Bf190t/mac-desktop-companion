@@ -1,0 +1,11 @@
+{
+  "name": "Mochi's reading voice",
+  "made_with": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit @ f90d617701d9f7f4ca499291e0b57f2b3c2fd2ee (Apache-2.0)",
+  "description": "十七岁的高中男生，嗓音清亮干净，音调偏高，语速稍快，语气平淡没什么起伏，话不多，有点淡漠但很温和。",
+  "description_en": "A seventeen-year-old high-school boy: a clear, clean voice, slightly high, a little fast, with an even tone; says little, a bit aloof but gentle.",
+  "seed": 2,
+  "text": "嗯，我知道了。今天也辛苦了，早点休息吧。有什么事的话，再叫我就好。",
+  "format": "16-bit PCM WAV, 24 kHz mono, 6.96 s",
+  "used_as": "speaker embedding (x-vector, no reference text) for mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit",
+  "note": "A synthetic voice generated from a text description. It is not a recording of, or modelled on, any real person or existing character."
+}

@@ -70,8 +70,12 @@ final class MetricsMonitor {
     } }
     func setPanelVisible(_ visible: Bool) { queue.async { [weak self] in
         guard let self else { return }
+        // Called on every runtime refresh; restarting an unchanged sampler would reset the CPU
+        // baseline and show "unreadable" for one full interval.
+        let unchanged = self.panelVisible == visible && (!visible || self.timer != nil)
         self.panelVisible = visible
         guard self.running, !self.suspended else { return }
+        if unchanged { self.publish(); return }
         self.configureSampling()
         if visible { self.refreshStorageIfNeeded(force: false) }
         self.publish()
@@ -113,7 +117,8 @@ final class MetricsMonitor {
         let source = DispatchSource.makeTimerSource(queue: queue)
         let slow = ProcessInfo.processInfo.isLowPowerModeEnabled || ProcessInfo.processInfo.thermalState.rawValue >= ProcessInfo.ThermalState.serious.rawValue
         let interval: Double = slow ? 15 : 5
-        source.schedule(deadline: .now() + interval, repeating: interval, leeway: .seconds(1))
+        // CPU needs two samples; take the second after 1 s so a fresh panel is not blank for 5–15 s.
+        source.schedule(deadline: .now() + 1, repeating: interval, leeway: .seconds(1))
         source.setEventHandler { [weak self] in self?.sample() }
         timer = source; source.resume()
     }
@@ -322,9 +327,12 @@ private enum MetricsClock {
 private final class ReadOnlyCPUTemperature {
     private var connection: io_connect_t = 0
     private var keys: [(key: UInt32, type: UInt32, size: UInt32)] = []
+    /// Core sensors found by scanning the SMC on chips without a fixed list (M5, M6, …).
+    /// Cached because the key set does not change while the app runs.
+    private static var discoveredCoreKeys: [String]?
     init?() {
         let brand = Self.stringSysctl("machdep.cpu.brand_string") ?? ""
-        let candidates: [String]
+        let candidates: [String]?
         if brand.hasPrefix("Apple M4") {
             candidates = ["Te05","Te0S","Te09","Te0H","Tp01","Tp05","Tp09","Tp0D","Tp0V","Tp0Y","Tp0b","Tp0e"]
         } else if brand.hasPrefix("Apple M3") {
@@ -334,12 +342,13 @@ private final class ReadOnlyCPUTemperature {
         } else if brand.hasPrefix("Apple M1") {
             candidates = ["Tp09","Tp0T","Tp01","Tp05","Tp0D","Tp0H","Tp0L","Tp0P","Tp0X","Tp0b"]
         } else if brand.contains("Intel") { candidates = ["TC0P"] }
+        else if brand.hasPrefix("Apple") { candidates = nil } // newer Apple chip: discover below
         else { return nil }
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
         guard service != 0 else { return nil }
         let result = IOServiceOpen(service,mach_task_self_,0,&connection); IOObjectRelease(service)
         guard result == KERN_SUCCESS, connection != 0 else { return nil }
-        for key in candidates {
+        for key in candidates ?? discoverCoreKeys() {
             if let info = call(key:Self.four(key),command:9,size:0) {
                 let size = Self.u32(info,28), type = Self.u32(info,32)
                 if (type == Self.four("flt ") && size == 4) || (type == Self.four("sp78") && size == 2) {
@@ -349,6 +358,24 @@ private final class ReadOnlyCPUTemperature {
         }
     }
     deinit { if connection != 0 { IOServiceClose(connection) } }
+    /// Performance-core (Tp0…) and efficiency-core (Te0…) die sensors, the same families the
+    /// fixed M1–M4 lists use. A full scan of ~2000 keys takes about 40 ms.
+    private func discoverCoreKeys() -> [String] {
+        if let cached = Self.discoveredCoreKeys { return cached }
+        let countKey = Self.four("#KEY")
+        guard let info = call(key:countKey,command:9,size:0),
+              let data = call(key:countKey,command:5,size:Self.u32(info,28)) else { return [] }
+        let count = UInt32(data[48])<<24 | UInt32(data[49])<<16 | UInt32(data[50])<<8 | UInt32(data[51])
+        var found:[String] = []
+        for index in 0..<min(count,8192) {
+            guard let entry = call(key:0,command:8,size:0,index:index) else { continue }
+            let key = Self.u32(entry,0)
+            let name = String(bytes:[24,16,8,0].map{ UInt8((key >> $0) & 0xff) },encoding:.ascii) ?? ""
+            if name.hasPrefix("Tp0") || name.hasPrefix("Te0") { found.append(name) }
+        }
+        Self.discoveredCoreKeys = found
+        return found
+    }
     func read() -> (value:Double,count:Int)? {
         var values:[Double] = []
         for spec in keys {
@@ -361,10 +388,11 @@ private final class ReadOnlyCPUTemperature {
         guard !values.isEmpty else { return nil }
         return (values.reduce(0,+) / Double(values.count), values.count)
     }
-    private func call(key:UInt32,command:UInt8,size:UInt32) -> [UInt8]? {
-        guard connection != 0, command == 5 || command == 9 else { return nil }
+    /// Read-only SMC commands: 5 read value, 8 key at index, 9 key info.
+    private func call(key:UInt32,command:UInt8,size:UInt32,index:UInt32=0) -> [UInt8]? {
+        guard connection != 0, command == 5 || command == 8 || command == 9 else { return nil }
         var input = [UInt8](repeating:0,count:80), output = input
-        Self.put(&input,0,key); Self.put(&input,28,size); input[42] = command
+        Self.put(&input,0,key); Self.put(&input,28,size); input[42] = command; Self.put(&input,44,index)
         var outputSize = 80
         let result = input.withUnsafeBytes { src in output.withUnsafeMutableBytes { dst in
             IOConnectCallStructMethod(connection,2,src.baseAddress,80,dst.baseAddress,&outputSize)

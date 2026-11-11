@@ -47,14 +47,21 @@ final class Preferences {
         self.defaults = defaults
         defaults.register(defaults: ["petHeight":320.0,"blueberryHeight":200.0,"chibiHeight":220.0,"chibiRoamMode":"horizontal","character":"chibi","companionHeight":220.0,"blueberryHopEnabled":false,"idleEnabled":true,
             "voiceEnabled":false,"readChatReplies":false,"clickThrough":false,"chatEnabled":false,"chatLongResidency":false,"hourlyEnabled":true,"speechEnabled":false,
-            "firstHour":9,"lastHour":22,"petHidden":false,"userPaused":false])
+            "firstHour":9,"lastHour":22,"petHidden":false,"userPaused":false,"readVoice":ReadVoice.defaultValue.rawValue])
     }
     var chibiRoamMode: PetRoamMode { get { PetRoamMode(rawValue:defaults.string(forKey:"chibiRoamMode") ?? "") ?? .horizontal } set { defaults.set(newValue.rawValue,forKey:"chibiRoamMode") } }
     var voiceEnabled: Bool { get { defaults.bool(forKey:"voiceEnabled") } set { defaults.set(newValue,forKey:"voiceEnabled") } }
     var readChatReplies: Bool { get { defaults.bool(forKey:"readChatReplies") } set { defaults.set(newValue,forKey:"readChatReplies") } }
+    /// C4: the voice that reads replies (Qwen3-TTS speaker, or the system voice).
+    var readVoice: ReadVoice { get { ReadVoice(rawValue:defaults.string(forKey:"readVoice") ?? "") ?? .defaultValue } set { defaults.set(newValue.rawValue,forKey:"readVoice") } }
     var chatEnabled: Bool { get { defaults.bool(forKey:"chatEnabled") } set { defaults.set(newValue,forKey:"chatEnabled") } }
     var chatLongResidency: Bool { get { defaults.bool(forKey:"chatLongResidency") } set { defaults.set(newValue,forKey:"chatLongResidency") } }
     var chatPersona: String { get { defaults.string(forKey:"chatPersona") ?? "" } set { defaults.set(newValue,forKey:"chatPersona") } }
+    /// The pet's small note about the user (B3), kept only on this Mac.
+    var userProfile: UserProfile {
+        get { guard let data = defaults.data(forKey:"userProfile"), let value = try? JSONDecoder().decode(UserProfile.self, from:data) else { return UserProfile() }; return value }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey:"userProfile") }
+    }
     var character: PetCharacter { get { PetCharacter(rawValue:defaults.string(forKey:"character") ?? "") ?? .chibi } set { defaults.set(newValue.rawValue,forKey:"character") } }
     var height: CGFloat { get { character.clampedHeight(CGFloat(defaults.double(forKey:character.heightKey))) } set { defaults.set(Double(character.clampedHeight(newValue)),forKey:character.heightKey) } }
     var blueberryHopEnabled: Bool { get { defaults.bool(forKey:"blueberryHopEnabled") } set { defaults.set(newValue,forKey:"blueberryHopEnabled") } }

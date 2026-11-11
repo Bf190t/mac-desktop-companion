@@ -123,7 +123,7 @@ final class MetricsPanelController: NSObject,NSWindowDelegate {
     private let header=label(L("窗口打开时更新 · 无历史曲线", "Updates while open · No history graphs"),11)
     override init() {
         panel=NSPanel(contentRect:NSRect(x:0,y:0,width:420,height:560),styleMask:[.titled,.closable,.resizable,.miniaturizable,.nonactivatingPanel],backing:.buffered,defer:false)
-        super.init();panel.title=L("状态小窗", "Computer & Bluetooth");panel.hidesOnDeactivate=false;panel.isReleasedWhenClosed=false;panel.level = .floating
+        super.init();panel.title=L("状态小窗", "Computer & Bluetooth");panel.hidesOnDeactivate=false;panel.isReleasedWhenClosed=false;panel.level = .petOverlay
         panel.collectionBehavior=[.canJoinAllSpaces,.ignoresCycle];panel.delegate=self
         DesktopWindowBehavior.configure(panel,minimumContentSize:NSSize(width:370,height:510))
         panel.setFrameAutosaveName("CompanionMetricsPanel")
@@ -212,7 +212,7 @@ final class MetricsPanelController: NSObject,NSWindowDelegate {
         for child in bluetoothDocument.subviews {child.removeFromSuperview()}
         batteryCards.removeAll();emptyBatteryNote=nil
         if snapshot.devices.isEmpty {
-            let empty=NSTextField(wrappingLabelWithString:Localizer.text(snapshot.statusText)+L("\n\n耳机请在日常使用时打开充电盒或佩戴，\n待 macOS 更新电量后再刷新。\n本应用不会扫描或主动连接设备。", "\n\nUse your headphones or open the charging case normally,\nthen refresh after macOS updates the battery record.\nThis app never scans or connects to devices."))
+            let empty=NSTextField(wrappingLabelWithString:Localizer.text(snapshot.statusText)+L("\n\n目前只显示 Apple 蓝牙配件（AirPods、妙控键盘/鼠标/触控板）。\n耳机请在日常使用时打开充电盒或佩戴，\n待 macOS 更新电量后再刷新。\n本应用不会扫描或主动连接设备。", "\n\nOnly Apple Bluetooth accessories are shown (AirPods, Magic Keyboard/Mouse/Trackpad).\nUse your headphones or open the charging case normally,\nthen refresh after macOS updates the battery record.\nThis app never scans or connects to devices."))
             empty.font = .systemFont(ofSize:12);empty.textColor = .secondaryLabelColor;bluetoothDocument.addSubview(empty);emptyBatteryNote=empty
         }
         let sameNames=Dictionary(grouping:snapshot.devices,by:{$0.name})

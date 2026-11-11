@@ -49,7 +49,7 @@ private final class PublicAcceptance {
         capture(app.pet,"mochi-large")
         for h:CGFloat in [140,220,360] {
             app.prefs.height=h;app.showIdle();app.constrainToScreens()
-            record("pet_on_screen_\(Int(h))",app.screenForPet().visibleFrame.insetBy(dx:-1,dy:-1).contains(app.pet.frame))
+            record("pet_on_screen_\(Int(h))",app.petVisibleFrame.insetBy(dx:-1,dy:-1).contains(app.pet.frame))
         }
         app.prefs.height=220;app.showIdle();app.constrainToScreens()
         app.prefs.chatEnabled=true;app.prefs.clickThrough=false;app.refreshRuntime()
@@ -108,15 +108,24 @@ private final class PublicAcceptance {
         capture(panel.panel,"bluetooth-min-"+suffix);panel.panel.setFrame(full,display:true)
         panel.panel.close();panel.onPageChange={ [weak app=self.app] in app?.syncMetricVisibility() }
         app.showChatInspector()
-        if let window=app.chatInspector?.window {window.setFrameAutosaveName("");record("chat_resizable_"+suffix,window.styleMask.contains(.resizable));capture(window,"model-"+suffix);window.close()}
-        app.showVoiceExperiment()
-        if let window=app.voiceWindow?.window {window.setFrameAutosaveName("");capture(window,"voice-"+suffix);window.close()}
+        if let inspector=app.chatInspector,let root=inspector.window.contentView {
+            let window=inspector.window
+            window.setFrameAutosaveName("");record("chat_resizable_"+suffix,window.styleMask.contains(.resizable))
+            // Voice now lives in this window: at the minimum size the voice row must fit and not overlap.
+            window.setContentSize(window.contentMinSize);root.layoutSubtreeIfNeeded()
+            let row:[NSView]=[inspector.voiceEnable,inspector.readReplies,inspector.readVoicePopup,inspector.previewVoice]
+            let frames=row.map{$0.convert($0.bounds,to:root)}
+            record("chat_voice_row_inside_window_"+suffix,frames.allSatisfy{root.bounds.insetBy(dx:-0.5,dy:-0.5).contains($0) && $0.width>10})
+            record("chat_voice_row_no_overlap_"+suffix,zip(frames,frames.dropFirst()).allSatisfy{$0.maxX<=$1.minX+0.5})
+            record("chat_read_voice_menu_"+suffix,inspector.readVoicePopup.numberOfItems == ReadVoice.allCases.count)
+            capture(window,"model-"+suffix);window.close()
+        }
         record("opening_diagnostics_is_inert_"+suffix,!app.chat.hasWorker && !app.voice.isRecording)
         app.syncChatVisibility()
     }
     func checkIdle(){
         app.setRoaming(false);app.prefs.chatEnabled=false;app.refreshRuntime();app.hideBubble()
-        app.settings?.close();app.metricsPanel.panel.close();app.chatInspector?.window.close();app.voiceWindow?.window.close()
+        app.settings?.close();app.metricsPanel.panel.close();app.chatInspector?.window.close()
         let began=ProcessInfo.processInfo.systemUptime, used=cpu()
         later(6){
             self.performance["idleSeconds"]=ProcessInfo.processInfo.systemUptime-began

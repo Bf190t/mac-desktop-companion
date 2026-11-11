@@ -52,7 +52,7 @@ struct ChatBoundaryTests {
         check("english_identity_names_original_mascot",ChatBoundary.identityReply.contains("Mochi") && !ChatBoundary.identityReply.contains("小团"))
         check("english_arithmetic_reaches_model",ChatBoundary.replyBeforeInference("What is 9 times 7?") == nil)
         check("english_unpunctuated_reply_uses_period",ChatBoundary.sanitizeReply("Take your time") == "Take your time.")
-        check("english_clock_states_limit",ChatBoundary.replyBeforeInference("What time is it?") == ChatBoundary.clockReply)
+        check("english_clock_reaches_model",ChatBoundary.replyBeforeInference("What time is it?") == nil)
         check("english_model_identity_routed",ChatBoundary.replyBeforeInference("What model do you use?") == ChatBoundary.modelReply)
         Language.current = .chinese
         check("switching_back_restores_chinese",ChatBoundary.identityReply.contains("小团") && Language.current == .chinese)

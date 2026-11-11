@@ -28,7 +28,11 @@ FORBIDDEN_SUFFIXES = {
 # Recognizable pre-publication assets must not re-enter a release.
 FORBIDDEN_ASSETS = {'Idle.png', 'Blink.png', 'Blueberry.png', 'VoiceSample.aiff',
                     'AssetManifest.json', 'python-runtime-provenance.json'}
-SOURCE_TOP = {'app', 'chat', 'scripts', 'tests', 'docs', '.github'}
+SOURCE_TOP = {'app', 'chat', 'voice', 'scripts', 'tests', 'docs', '.github'}
+# The one audio file that may ship: the companion's synthetic reading voice, generated from a text
+# description with Qwen3-TTS VoiceDesign (Apache-2.0). It is not a system-voice or personal recording;
+# see voice/companion_voice.json. Any other audio is still rejected.
+ALLOWED_AUDIO = {'voice/companion_voice.wav', 'Contents/Resources/Voice/companion_voice.wav'}
 SOURCE_ROOT_FILES = {
     'README.md', 'README.zh-CN.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md',
     'SECURITY.md', 'CONTRIBUTING.md', '.gitignore', '.gitattributes',
@@ -69,7 +73,8 @@ class Audit:
             return False
         if any(p in FORBIDDEN_COMPONENTS for p in parts):
             self.flag(name, 'excluded-directory')
-        if path.suffix.lower() in FORBIDDEN_SUFFIXES or path.name in FORBIDDEN_ASSETS:
+        allowed_audio = any(name == a or name.endswith('/' + a) for a in ALLOWED_AUDIO)
+        if (path.suffix.lower() in FORBIDDEN_SUFFIXES and not allowed_audio) or path.name in FORBIDDEN_ASSETS:
             self.flag(name, 'excluded-artifact')
         if path.name == '.DS_Store' or path.name == '.env' or path.name.startswith('.env.'):
             self.flag(name, 'local-metadata-or-environment')

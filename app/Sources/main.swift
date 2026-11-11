@@ -34,13 +34,13 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
     var monitorSuspended=false
     var metricsRequested=false
     var speech:AVSpeechSynthesizer?
+    var chimePlayer:AVAudioPlayer?
     var workspaceObservers:[NSObjectProtocol]=[]
     var appObservers:[NSObjectProtocol]=[]
     var distributedObservers:[NSObjectProtocol]=[]
     var clicked=0
     var isQuitting=false
     let voice=PetVoiceService()
-    var voiceWindow:VoiceExperimentController?
     var voiceOriginIsPet=false
     var reconcilingInteraction=false
     let chat=PetChatService()
@@ -48,6 +48,10 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
     var chatInput:PetInputPanel?
     var chatInputView:PetInputView?
     var chatBubbleUntil:TimeInterval=0
+    var lastPetVisibleFrame=NSRect(x:0,y:0,width:1280,height:800)
+    /// Last edit in the pet input. A draft left untouched for 2 minutes stops counting as
+    /// "busy", so a forgotten half-typed line does not silence every hourly chime.
+    var lastDraftEdit:TimeInterval=0
 
     var policy:ActivityPolicy {
         ActivityPolicy(petHidden:prefs.petHidden,userPaused:prefs.userPaused,suspended:!suspensions.isEmpty,
@@ -76,7 +80,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         petView.onDragEnd={ [weak self] in guard let self=self else{return};self.dragging=false;self.savePosition();self.scheduleIdle();self.syncRoaming() }
         petView.onTap={ [weak self] in guard let self=self else{return};self.dragging=false;self.interact();self.scheduleIdle() }
         petView.onMenu={ [weak self] event in guard let self=self else{return};NSMenu.popUpContextMenu(self.statusMenu,with:event,for:self.petView) }
-        bubble=CompanionPanel(rect:NSRect(x:0,y:0,width:240,height:104));bubble.ignoresMouseEvents=true
+        bubble=CompanionPanel(rect:NSRect(x:0,y:0,width:240,height:104));bubble.ignoresMouseEvents=true;bubble.level = .petOverlay
         bubbleView=BubbleView(frame:NSRect(x:0,y:0,width:240,height:104));bubble.contentView=bubbleView
         metricsPanel.onClose={ [weak self] in self?.metricsRequested=false;self?.monitor.setPanelVisible(false);self?.bluetoothMonitor.setVisible(false) }
         metricsPanel.onRefresh={ [weak self] in self?.monitor.refreshStorage() }
@@ -114,19 +118,20 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         @discardableResult func item(_ title:String,_ action:Selector?,_ key:String="") -> NSMenuItem {
             let v=NSMenuItem(title:title,action:action,keyEquivalent:key);v.target=self;statusMenu.addItem(v);return v
         }
-        let heading=item(L("桌面伴伴 · 0.1.0 开源版", "Desktop Companion · 0.1.0 Open source"),nil);heading.isEnabled=false
+        let heading=item(L("桌面伴伴 · 0.2.0 开源版", "Desktop Companion · 0.2.0 Open source"),nil);heading.isEnabled=false
         let characterMenu=NSMenu(title:L("选择角色", "Choose character"))
         for character in PetCharacter.allCases {
             let choice=NSMenuItem(title:character.title,action:#selector(characterMenuChanged(_:)),keyEquivalent:"")
             choice.target=self;choice.representedObject=character.rawValue;choice.state=prefs.character == character ? .on:.off;characterMenu.addItem(choice)
         }
         item(L("选择角色", "Choose character"),nil).submenu=characterMenu
-        item(L("电脑状态小窗", "Computer status"),#selector(toggleMetrics)).state=metricsPanel.panel.isVisible ? .on:.off
-        item(L("蓝牙设备电量", "Bluetooth battery"),#selector(showBluetooth))
+        // Each item owns one page of the shared panel; the check mark follows the visible page.
+        let metricsShown=metricsPanel.panel.isVisible && !metricsPanel.panel.isMiniaturized
+        item(L("电脑状态小窗", "Computer status"),#selector(toggleMetrics)).state=metricsShown && !metricsPanel.isBluetoothPage ? .on:.off
+        item(L("蓝牙设备电量", "Bluetooth battery"),#selector(showBluetooth)).state=metricsShown && metricsPanel.isBluetoothPage ? .on:.off
         item(roamingEnabled ? L("脚边聊天（散步时暂时隐藏）", "Foot-level chat (hidden while roaming)"):L("角色脚边聊天", "Foot-level chat"),#selector(toggleChat)).state=effectiveChatEnabled ? .on:.off
         statusMenu.items.last?.isEnabled = !roamingEnabled
-        item(L("本地模型状态与调试…", "Local model status & debugging…"),#selector(showChatInspector))
-        item(L("语音实验…", "Voice experiment…"),#selector(showVoiceExperiment))
+        item(L("本地聊天 · 模型与语音…", "Local chat · Model & voice…"),#selector(showChatInspector))
         statusMenu.addItem(.separator())
         item(prefs.petHidden ? L("显示桌宠", "Show companion"):L("隐藏桌宠", "Hide companion"),#selector(toggleHidden))
         item(prefs.userPaused ? L("继续动作", "Resume motion"):L("暂停动作", "Pause motion"),#selector(togglePause))
@@ -149,7 +154,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         }
         statusMenu.addItem(.separator())
         item(L("整点气泡报时", "Hourly time bubble"),#selector(toggleHourly)).state=prefs.hourlyEnabled ? .on:.off
-        item(L("试一下报时气泡", "Preview time bubble"),#selector(testChime)).isEnabled=policy.canChime
+        item(L("试一下报时气泡", "Preview time bubble"),#selector(testChime)).isEnabled=policy.canChime && interactionDecision.canAnnounceHour
         item(L("角色、大小与报时…", "Character, size & time…"),#selector(showSettings),",")
         item(L("重置桌宠位置", "Reset companion position"),#selector(resetPosition))
         item(L("使用说明与限制…", "Help & limitations…"),#selector(showHelp))
@@ -181,8 +186,16 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         status.button?.toolTip=L("桌面伴伴 · ", "Desktop Companion · ")+character.title
     }
     @objc func toggleHourly(){prefs.hourlyEnabled.toggle();scheduleHour();syncSettings()}
-    @objc func toggleMetrics(){if metricsPanel.panel.isVisible && !metricsPanel.panel.isMiniaturized{metricsPanel.panel.close()}else{showMetrics()}}
-    @objc func showBluetooth(){metricsPanel.selectBluetooth(true);showMetrics()}
+    @objc func toggleMetrics(){toggleMetricsPage(bluetooth:false)}
+    @objc func showBluetooth(){toggleMetricsPage(bluetooth:true)}
+    /// Opens the requested page. Closes the panel only when that same page is already showing,
+    /// so the computer item never reopens a stale Bluetooth page (or closes it) and vice versa.
+    func toggleMetricsPage(bluetooth:Bool){
+        let shown=metricsPanel.panel.isVisible && !metricsPanel.panel.isMiniaturized
+        if shown && metricsPanel.isBluetoothPage == bluetooth {metricsPanel.panel.close();return}
+        if metricsPanel.isBluetoothPage != bluetooth {metricsPanel.selectBluetooth(bluetooth)}
+        showMetrics()
+    }
     func syncMetricVisibility(){
         let visible=metricsRequested && metricsPanel.panel.isVisible && !metricsPanel.panel.isMiniaturized && suspensions.isEmpty
         monitor.setPanelVisible(visible && !metricsPanel.isBluetoothPage)
@@ -196,7 +209,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         constrainUtilityWindows();metricsPanel.panel.makeKeyAndOrderFront(nil);syncMetricVisibility();metricsPanel.update(monitor.latest);metricsPanel.updateBluetooth(bluetoothMonitor.latest)
     }
     @objc func testChime(){guard policy.canChime else{return};chime(Date(),test:true)}
-    @objc func resetPosition(){stopCharacterMotion();let r=NSScreen.main?.visibleFrame ?? NSScreen.screens[0].visibleFrame;ground=NSPoint(x:r.maxX-120,y:r.minY+14);showIdle();constrainToScreens();savePosition();if !prefs.petHidden && suspensions.isEmpty{pet.orderFrontRegardless()};scheduleIdle();syncRoaming()}
+    @objc func resetPosition(){stopCharacterMotion();guard let r=(NSScreen.main ?? NSScreen.screens.first)?.visibleFrame else{return};ground=NSPoint(x:r.maxX-120,y:r.minY+14);showIdle();constrainToScreens();savePosition();if !prefs.petHidden && suspensions.isEmpty{pet.orderFrontRegardless()};scheduleIdle();syncRoaming()}
     func place(image:NSImage){
         let h=prefs.height,w=h*image.size.width/image.size.height
         let panelHeight=h+prefs.character.headroom(for:h),padding=prefs.character.sidePadding(for:w),panelWidth=w+2*padding
@@ -205,17 +218,31 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         petView.artworkSize=NSSize(width:w,height:h);petView.frame=NSRect(x:0,y:0,width:panelWidth,height:panelHeight);petView.needsLayout=true;petView.layoutSubtreeIfNeeded();petView.show(image)
     }
     func showIdle(){guard idle != nil else{return};lastRoamPose = .standing;place(image:idle)}
-    func screenForPet()->NSScreen{
-        NSScreen.screens.first{ $0.visibleFrame.insetBy(dx:-1,dy:-1).contains(ground) } ?? NSScreen.main ?? NSScreen.screens[0]
+    func screenForPet()->NSScreen?{
+        NSScreen.screens.first{ $0.visibleFrame.insetBy(dx:-1,dy:-1).contains(ground) } ?? NSScreen.main ?? NSScreen.screens.first
+    }
+    /// Visible area for the pet. With no display attached (KVM switch, monitor deep sleep on a
+    /// Mac mini) NSScreen.screens is briefly empty; keep the last area instead of crashing.
+    var petVisibleFrame:NSRect {
+        if let frame=screenForPet()?.visibleFrame {lastPetVisibleFrame=frame}
+        return lastPetVisibleFrame
+    }
+    /// Display connect/disconnect. The pet is clamped onto a remaining screen for now, but the
+    /// position the user chose is not overwritten; when that display returns, the pet goes back.
+    func screensChanged(){
+        guard !NSScreen.screens.isEmpty else{return}
+        stopCharacterMotion()
+        if let home=prefs.position,NSScreen.screens.contains(where:{$0.visibleFrame.insetBy(dx:-1,dy:-1).contains(home)}) {ground=home;showIdle()}
+        constrainToScreens();constrainUtilityWindows();refreshRuntime()
     }
     func constrainToScreens(){
-        let r=screenForPet().visibleFrame
+        let r=petVisibleFrame
         let origin=clampedOrigin(pet.frame.origin,size:pet.frame.size,visible:r)
         ground.x += origin.x-pet.frame.origin.x;ground.y += origin.y-pet.frame.origin.y;showIdle()
     }
     func drag(to origin:NSPoint){
         let center=NSPoint(x:origin.x+pet.frame.width/2,y:origin.y+pet.frame.height/2)
-        let screen=NSScreen.screens.first{$0.visibleFrame.contains(center)} ?? screenForPet()
+        guard let screen=NSScreen.screens.first(where:{$0.visibleFrame.contains(center)}) ?? screenForPet() else{return}
         let p=clampedOrigin(origin,size:pet.frame.size,visible:screen.visibleFrame)
         ground=NSPoint(x:p.x+pet.frame.width/2,y:p.y);pet.setFrameOrigin(p);positionChatInput();if bubble.isVisible{positionBubble()}
     }
@@ -260,23 +287,31 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         bubbleTimer=Timer.scheduledTimer(withTimeInterval:duration,repeats:false){[weak self] _ in self?.hideBubble()};bubbleTimer?.tolerance=1
     }
     func positionBubble(){
-        let r=screenForPet().visibleFrame;let f=pet.frame;let onLeft=f.midX>r.midX
+        let r=petVisibleFrame;let f=pet.frame;let onLeft=f.midX>r.midX
         bubbleView.tailOnRight=onLeft;bubbleView.needsDisplay=true
         let x=onLeft ? f.minX-bubble.frame.width+11:f.maxX-11;let y=prefs.character == .blueberry ? ground.y+prefs.height*0.55-52:f.maxY-83
         bubble.setFrameOrigin(clampedOrigin(NSPoint(x:x,y:y),size:bubble.frame.size,visible:r))
     }
-    func hideBubble(){bubbleTimer?.invalidate();bubbleTimer=nil;bubble?.orderOut(nil)}
+    func hideBubble(){bubbleTimer?.invalidate();bubbleTimer=nil;bubble?.orderOut(nil);chatBubbleUntil=0}
     func chime(_ date:Date,test:Bool=false){
         guard policy.canChime,interactionDecision.canAnnounceHour else{return}
         let h=Calendar.current.component(.hour,from:date)
         let hourNote=h>=22 ? L("今天辛苦了，记得休息。", "Time to rest after a long day."):L("别忘了偶尔活动一下。", "Remember to take a little stretch.")
         let text=test ? L("这是报时气泡示例。\n整点时，我会在这里告诉你时间。", "This is a time-bubble preview.\nAt the hour, I'll show the time here."):L("现在是\(h)点。\n\(hourNote)", "It is \(h):00.\n\(hourNote)")
         say(text,duration:9)
-        if prefs.speechEnabled,let voice=AVSpeechSynthesisVoice.speechVoices().first(where:{$0.language.hasPrefix("zh")}) {
+        guard prefs.speechEnabled else{return}
+        stopChimeSpeech()
+        // The companion's own voice from clips recorded at install time; the system voice otherwise.
+        if prefs.readVoice.isNeural,let clip=NeuralSpeechInstall.chimeClip(hour:test ? nil:h),let player=try? AVAudioPlayer(contentsOf:clip) {
+            chimePlayer=player;player.play()
+        } else if let voice=VoicePolicy.bestVoice() {
             if speech == nil {speech=AVSpeechSynthesizer()}
-            speech?.stopSpeaking(at:.immediate);let u=AVSpeechUtterance(string:test ? L("这是报时示例。", "This is a time announcement preview."):L("现在是\(h)点。", "It is \(h):00."));u.voice=voice;u.rate=0.47;speech?.speak(u)
+            let u=AVSpeechUtterance(string:NeuralSpeechInstall.chimeText(hour:test ? nil:h));u.voice=voice;u.rate=0.47;speech?.speak(u)
         }
     }
+    /// Stops a spoken hourly chime, whichever voice is reading it.
+    func stopChimeSpeech(){speech?.stopSpeaking(at:.immediate);chimePlayer?.stop();chimePlayer=nil}
+    var chimeSpeaking:Bool {speech?.isSpeaking == true || chimePlayer?.isPlaying == true}
     func scheduleHour(){
         hourTimer?.invalidate();hourTimer=nil
         guard policy.canChime,let next=hourly.next(after:Date()) else{return}
@@ -289,7 +324,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
     func refreshRuntime(){
         guard pet != nil else{return}
         idleTimer?.invalidate();blinkReturn?.invalidate();stopCharacterMotion();petView.stopMotion();showIdle()
-        if prefs.petHidden || !suspensions.isEmpty {pet.orderOut(nil);hideBubble();speech?.stopSpeaking(at:.immediate)}else{pet.orderFrontRegardless()}
+        if prefs.petHidden || !suspensions.isEmpty {pet.orderOut(nil);hideBubble();stopChimeSpeech()}else{pet.orderFrontRegardless();if bubble.isVisible{bubble.order(.above,relativeTo:pet.windowNumber)}}
         pet.ignoresMouseEvents=effectiveClickThrough
         syncChatVisibility()
         let shouldSuspend = !suspensions.isEmpty
@@ -302,7 +337,11 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         scheduleIdle();scheduleHour();syncSettings()
     }
     func setSuspension(_ cause:String,_ active:Bool){
-        if active {chat.suspended=true;chat.release(cause);chatInspector?.window.orderOut(nil);chatInspector?.hideAuxiliaryWindows();voiceWindow?.window.orderOut(nil);voice.shutdown(reason:L("系统暂停", "System pause"));chat.inspecting=false}
+        if active {
+            chat.suspended=true;chat.release(cause);chatInspector?.window.orderOut(nil);chatInspector?.hideAuxiliaryWindows();voice.shutdown(reason:L("系统暂停", "System paused"));chat.inspecting=false
+            // orderOut does not send windowWillClose, so drop the Dock icon here as closing would.
+            if settings?.isVisible != true && !diagnosticVisible {NSApp.setActivationPolicy(.accessory)}
+        }
         if active{suspensions.insert(cause)}else{suspensions.remove(cause);checkInitialSession()}
         chat.suspended = !suspensions.isEmpty || prefs.petHidden
         refreshRuntime()
@@ -314,7 +353,9 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         if let s=CGSessionCopyCurrentDictionary() as? [String:Any] {
             // This compatibility key is not a public lock-state contract. Workspace
             // display/sleep/session events provide separate conservative stops.
-            if let locked=s["CGSSessionScreenIsLocked"] as? Bool {if locked{suspensions.insert("lock")}else{suspensions.remove("lock")}}
+            // The key is absent (not false) once unlocked, so absence must clear a stale "lock";
+            // otherwise the delayed re-check after unlock can leave the pet hidden indefinitely.
+            if (s["CGSSessionScreenIsLocked"] as? Bool) ?? false {suspensions.insert("lock")}else{suspensions.remove("lock")}
             if let onConsole=s[kCGSessionOnConsoleKey as String] as? Bool {if !onConsole{suspensions.insert("session")}else{suspensions.remove("session")}}
         }
     }
@@ -330,17 +371,17 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         for name in [ProcessInfo.thermalStateDidChangeNotification,Notification.Name.NSProcessInfoPowerStateDidChange] {
             appObservers.append(NotificationCenter.default.addObserver(forName:name,object:nil,queue:.main){[weak self] _ in self?.refreshRuntime()})
         }
-        appObservers.append(NotificationCenter.default.addObserver(forName:NSApplication.didChangeScreenParametersNotification,object:nil,queue:.main){[weak self] _ in self?.stopCharacterMotion();self?.constrainToScreens();self?.constrainUtilityWindows();self?.savePosition();self?.refreshRuntime()})
+        appObservers.append(NotificationCenter.default.addObserver(forName:NSApplication.didChangeScreenParametersNotification,object:nil,queue:.main){[weak self] _ in self?.screensChanged()})
         for name in [Notification.Name.NSSystemTimeZoneDidChange,Notification.Name.NSSystemClockDidChange] {
             appObservers.append(NotificationCenter.default.addObserver(forName:name,object:nil,queue:.main){[weak self] _ in self?.scheduleHour()})
         }
     }
     func constrainUtilityWindows(){
-        for w in [metricsPanel.panel as NSWindow,settings,chatInspector?.window,voiceWindow?.window].compactMap({$0}) {
-            let screen=w.screen ?? NSScreen.screens.max(by:{
+        for w in [metricsPanel.panel as NSWindow,settings,chatInspector?.window].compactMap({$0}) {
+            guard let screen=w.screen ?? NSScreen.screens.max(by:{
                 let a=$0.visibleFrame.intersection(w.frame),b=$1.visibleFrame.intersection(w.frame)
                 return (a.isNull ? 0:a.width*a.height) < (b.isNull ? 0:b.width*b.height)
-            }) ?? screenForPet()
+            }) ?? screenForPet() else{continue}
             w.setFrame(DesktopWindowBehavior.constrainedFrame(w.frame,visibleFrame:screen.visibleFrame),display:true)
         }
         positionChatInput();if bubble.isVisible {positionBubble()}
@@ -372,7 +413,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         let title=label(L("安静地陪在桌面上", "A quiet friend on your desktop"),22,.semibold);title.frame=NSRect(x:25,y:568,width:380,height:32);content.addSubview(title)
         let languageLabel=label(L("语言 / Language", "Language / 语言"),11);languageLabel.frame=NSRect(x:25,y:518,width:135,height:20);content.addSubview(languageLabel)
         let language=NSPopUpButton(frame:NSRect(x:160,y:514,width:245,height:28),pullsDown:false);language.addItems(withTitles:["简体中文","English"]);language.target=self;language.action=#selector(languageChanged(_:));content.addSubview(language);controls["language"]=language
-        let sub=label(L("默认不自启、不联网；完全退出可从菜单栏操作。", "No auto-start. Quit from the ✿ menu."),11);sub.textColor = .secondaryLabelColor;sub.frame=NSRect(x:25,y:542,width:385,height:20);content.addSubview(sub)
+        let sub=label(L("默认不自启；只在你点安装时联网下载；完全退出可从菜单栏操作。", "No auto-start; downloads only when you choose Install. Quit from the ✿ menu."),11);sub.textColor = .secondaryLabelColor;sub.frame=NSRect(x:25,y:542,width:385,height:20);content.addSubview(sub)
         let characterLabel=label(L("当前角色", "Character"),13,.medium);characterLabel.frame=NSRect(x:25,y:402,width:90,height:22);content.addSubview(characterLabel)
         let characterPicker=NSPopUpButton(frame:NSRect(x:120,y:398,width:240,height:28),pullsDown:false)
         characterPicker.addItems(withTitles:PetCharacter.allCases.map{$0.title});characterPicker.identifier=NSUserInterfaceItemIdentifier("character");characterPicker.target=self;characterPicker.action=#selector(settingChanged(_:));content.addSubview(characterPicker);controls["character"]=characterPicker
@@ -387,7 +428,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         let roamLabel=label(L("散步范围", "Roam area"),13,.medium);roamLabel.frame=NSRect(x:25,y:316,width:90,height:24);content.addSubview(roamLabel);controls["roamModeLabel"]=roamLabel
         let roamMode=NSPopUpButton(frame:NSRect(x:120,y:314,width:240,height:28),pullsDown:false);roamMode.addItems(withTitles:[L("横向溜达", "Horizontal stroll"),L("全屏八向", "All directions")]);roamMode.identifier=NSUserInterfaceItemIdentifier("roamMode");roamMode.target=self;roamMode.action=#selector(settingChanged(_:));content.addSubview(roamMode);controls["roamMode"]=roamMode
         check("hourly",L("整点用角色气泡报时", "Hourly time bubble"),198)
-        check("speech",L("同时使用系统中文语音（默认关闭）", "Also use the system Chinese voice (off by default)"),163)
+        check("speech",L("整点时也念出来（默认关闭）", "Also say the time aloud (off by default)"),163)
         let range=label(L("报时时段", "Active hours"),12);range.frame=NSRect(x:25,y:117,width:85,height:22);content.addSubview(range)
         for (key,x) in [("first",CGFloat(119)),("last",CGFloat(248))] {
             let p=NSPopUpButton(frame:NSRect(x:x,y:113,width:92,height:28),pullsDown:false);p.addItems(withTitles:(0..<24).map{String(format:"%02d:00",$0)});p.identifier=NSUserInterfaceItemIdentifier(key);p.target=self;p.action=#selector(settingChanged(_:));content.addSubview(p);controls[key]=p
@@ -398,13 +439,15 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         for (title,action,x) in [(L("使用说明", "Help"),#selector(showHelp),CGFloat(23)),(L("状态小窗", "Status"),#selector(toggleMetrics),CGFloat(218)),(L("完全退出", "Quit"),#selector(quit),CGFloat(318))] {
             let b=NSButton(title:title,target:self,action:action);b.bezelStyle = .rounded;b.frame=NSRect(x:x,y:7,width:91,height:28);content.addSubview(b)
         }
-        let chatButton=NSButton(title:L("本地聊天与模型设置…", "Local chat & model settings…"),target:self,action:#selector(showChatInspector));chatButton.bezelStyle = .rounded;chatButton.frame=NSRect(x:25,y:488,width:210,height:30);content.addSubview(chatButton)
+        let chatButton=NSButton(title:L("本地聊天 · 模型与语音…", "Local chat · Model & voice…"),target:self,action:#selector(showChatInspector));chatButton.bezelStyle = .rounded;chatButton.frame=NSRect(x:25,y:488,width:210,height:30);content.addSubview(chatButton)
         let chatSwitch=NSButton(checkboxWithTitle:L("显示脚边输入框", "Show foot-level input"),target:self,action:#selector(toggleChat));chatSwitch.frame=NSRect(x:250,y:490,width:180,height:26);content.addSubview(chatSwitch);controls["chat"]=chatSwitch
-        let voiceButton=NSButton(title:L("语音实验：按住说话与朗读…", "Voice experiment: talk & read…"),target:self,action:#selector(showVoiceExperiment));voiceButton.bezelStyle = .rounded;voiceButton.frame=NSRect(x:25,y:445,width:330,height:30);content.addSubview(voiceButton)
+        let voiceSwitch=NSButton(checkboxWithTitle:L("开启语音输入（点一下开始录音，再点一下停止）", "Voice input (click to start recording, click again to stop)"),target:self,action:#selector(toggleVoiceSetting(_:)));voiceSwitch.frame=NSRect(x:25,y:447,width:400,height:26);content.addSubview(voiceSwitch);controls["voice"]=voiceSwitch
         content.captureBaseline();constrainUtilityWindows()
     }
+    @objc func toggleVoiceSetting(_ sender:NSButton){prefs.voiceEnabled=sender.state == .on;voice.enabled=prefs.voiceEnabled;syncChatVisibility();syncSettings()}
     func syncSettings(){
         (controls["language"] as? NSPopUpButton)?.selectItem(at:Language.current == .chinese ? 0:1)
+        (controls["voice"] as? NSButton)?.state=voice.enabled ? .on:.off
         (controls["chat"] as? NSButton)?.state=effectiveChatEnabled ? .on:.off
         (controls["chat"] as? NSButton)?.isEnabled = !roamingEnabled
         (controls["chat"] as? NSButton)?.title=roamingEnabled ? L("散步时暂时隐藏", "Hidden while roaming"):L("显示脚边输入框", "Show foot-level input")
@@ -427,6 +470,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         Language.current=sender.indexOfSelectedItem == 0 ? .chinese:.english
         for window in NSApp.windows {Localizer.localize(window)}
         if let menu=NSApp.mainMenu {Localizer.localize(menu)}
+        voice.languageChanged()
         buildMenu();syncSettings();syncChatVisibility()
         monitor.refreshLocalization();metricsPanel.update(monitor.latest);metricsPanel.updateBluetooth(bluetoothMonitor.latest)
         pet.title=L("桌面伴伴", "Desktop Companion")
@@ -444,21 +488,23 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         case "character":
             if let index=(sender as? NSPopUpButton)?.indexOfSelectedItem,PetCharacter.allCases.indices.contains(index){selectCharacter(PetCharacter.allCases[index])};return
         case "hourly":prefs.hourlyEnabled=enabled
-        case "speech":prefs.speechEnabled=enabled;if !enabled{speech?.stopSpeaking(at:.immediate)}
+        case "speech":prefs.speechEnabled=enabled;if !enabled{stopChimeSpeech()}
         case "first":prefs.firstHour=(sender as! NSPopUpButton).indexOfSelectedItem
         case "last":prefs.lastHour=(sender as! NSPopUpButton).indexOfSelectedItem
         default:break
         };refreshRuntime()
     }
     @objc func showHelp(){
-        let a=NSAlert();a.messageText=L("桌面伴伴 · 本地实验版", "Desktop Companion · Open source")
-        a.informativeText=L("点击小团查看对话气泡，拖动换位置；右键或菜单栏 ✿ 打开控制菜单。原创形象由程序绘制，不包含第三方角色素材。\n\n电脑与蓝牙状态窗口可拖动、缩放。仅在相应页面可见时轮询；蓝牙电量是 macOS 最近记录，可能滞后，不扫描、不主动连接。存储每小时刷新；内存压力近一小时统计只包含本应用观察到的时段。温度与 GPU 读数依赖机型和系统。\n\n散步是默认关闭的实验功能；开启后暂时隐藏脚边输入框并启用鼠标穿透，关闭后恢复原设置。隐藏、锁屏、休眠或低电量时暂停动作，不阻止系统休眠。\n\n本地聊天模型为可选安装；只有主动安装时下载资源，聊天推理禁止网络访问。闲置120秒释放，长驻留实验为30分钟；内存压力、锁屏、熄屏仍会提前释放。聊天不读取电脑状态、不执行操作。语音实验默认关闭，只使用系统离线中文识别和本机朗读，无唤醒词或云端回退。\n\n源码按 MIT 开源。此分发包使用本机签名，未获 Apple 开发者公证。", "Click Mochi for a bubble, drag to move, or use the ✿ menu to control the app. The original mascot is drawn in code and includes no third-party character art.\n\nComputer and Bluetooth windows can be moved and resized. Only the visible page polls. Battery values are the latest macOS records and may be stale; the app never scans or connects. Storage updates hourly. Past-hour memory pressure includes only periods observed by this app. Temperature and GPU readings depend on hardware and macOS.\n\nRoaming is experimental and off by default. It temporarily hides the foot-level input and enables click-through, restoring your settings when stopped. Motion pauses when hidden, locked, asleep, or in low power. The app does not prevent system sleep.\n\nLocal chat is an optional installation. Resources download only when you choose Install; model inference cannot use the network. The model unloads after 120 seconds idle, or 30 minutes in the long-residency experiment. Memory pressure, lock, and display sleep can unload it earlier. Chat cannot read computer state or perform actions. Voice is an optional experiment using offline Chinese recognition and local system speech, with no wake word or cloud fallback.\n\nSource code is MIT licensed. This build is locally signed, not Apple notarized.")
-        a.addButton(withTitle:L("知道了", "Got it"));a.runModal()
+        let a=NSAlert();a.messageText=L("桌面伴伴 · 开源版", "Desktop Companion · Open source")
+        a.informativeText=L("点击小团查看对话气泡，拖动换位置；右键或菜单栏 ✿ 打开控制菜单。原创形象由程序绘制，不包含第三方角色素材。\n\n电脑与蓝牙状态窗口可拖动、缩放。仅在相应页面可见时轮询；蓝牙电量是 macOS 最近记录，可能滞后，不扫描、不主动连接。存储每小时刷新；内存压力近一小时统计只包含本应用观察到的时段。温度与 GPU 读数依赖机型和系统。\n\n散步是默认关闭的实验功能；开启后暂时隐藏脚边输入框并启用鼠标穿透，关闭后恢复原设置。隐藏、锁屏、休眠或低电量时暂停动作，不阻止系统休眠。\n\n本地聊天模型为可选安装；只有主动安装时下载资源，聊天推理禁止网络访问。闲置120秒释放，长驻留实验为30分钟；内存压力、锁屏、熄屏仍会提前释放。聊天不读取电脑状态、不执行操作；会按当前时间回答，并记住你在聊天里说的关于自己的事（可在「记住的关于你」里修改或清空）。\n\n语音输入默认关闭：点一下开始录音，再点一下停止，转写后检查文字再发送；只用本机系统识别，跟随界面语言，没有唤醒词或云端回退。回复可以用系统声音朗读，也可以另外安装小团的朗读声音（本机神经网络朗读，约 2.5 GB，朗读进程同样禁止联网）。\n\n说到很难熬的话题时，回复后会附上按系统地区给出的求助热线。\n\n源码按 MIT 开源。此分发包使用本机签名，未获 Apple 开发者公证。",
+                            "Click Mochi for a bubble, drag to move, or use the ✿ menu to control the app. The original mascot is drawn in code and includes no third-party character art.\n\nComputer and Bluetooth windows can be moved and resized. Only the visible page polls. Battery values are the latest macOS records and may be stale; the app never scans or connects. Storage updates hourly. Past-hour memory pressure includes only periods observed by this app. Temperature and GPU readings depend on hardware and macOS.\n\nRoaming is experimental and off by default. It temporarily hides the foot-level input and enables click-through, restoring your settings when stopped. Motion pauses when hidden, locked, asleep, or in low power. The app does not prevent system sleep.\n\nLocal chat is an optional installation. Resources download only when you choose Install; model inference cannot use the network. The model unloads after 120 seconds idle, or 30 minutes in the long-residency experiment. Memory pressure, lock, and display sleep can unload it earlier. Chat cannot read computer state or perform actions; it knows the current time and remembers what you say about yourself (edit or clear it under What I remember about you).\n\nVoice input is off by default: click to start recording, click again to stop, then check the transcript before sending. It uses on-device system recognition in the interface language, with no wake word or cloud fallback. Replies can be read by the system voice, or by Mochi's own voice after an optional install (on-device neural speech, about 2.5 GB; its helper also runs without network access).\n\nWhen a message sounds like someone is struggling, the reply ends with a crisis line for the Mac's region.\n\nSource code is MIT licensed. This build is locally signed, not Apple notarized.")
+        // A menu-bar app is not active; bring it forward so the modal is not hidden behind other apps.
+        a.addButton(withTitle:L("知道了", "Got it"));NSApp.activate(ignoringOtherApps:true);a.runModal()
     }
     func windowWillClose(_ notification:Notification) {
         if notification.object as? NSWindow === settings {
             DispatchQueue.main.async { [weak self] in
-                if self?.chatInspector?.window.isVisible != true && self?.voiceWindow?.window.isVisible != true {NSApp.setActivationPolicy(.accessory)}
+                if self?.chatInspector?.window.isVisible != true {NSApp.setActivationPolicy(.accessory)}
             }
         }
     }
@@ -468,7 +514,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         isQuitting=true;ModelInstallation.shared.cancel();roamingEnabled=false;roamController?.stop();voice.shutdown(reason:L("应用退出", "App exit"));chat.terminateSynchronously();savePosition();
         if CommandLine.arguments.contains("--ui-check"){prefs.defaults.removePersistentDomain(forName:AppDelegate.qaDefaultsName)}
         idleTimer?.invalidate();blinkReturn?.invalidate();bubbleTimer?.invalidate();hourTimer?.invalidate()
-        monitor.stop();bluetoothMonitor.stop();speech?.stopSpeaking(at:.immediate)
+        monitor.stop();bluetoothMonitor.stop();stopChimeSpeech()
         for t in workspaceObservers{NSWorkspace.shared.notificationCenter.removeObserver(t)}
         for t in appObservers{NotificationCenter.default.removeObserver(t)}
         for t in distributedObservers{DistributedNotificationCenter.default().removeObserver(t)}
@@ -503,6 +549,9 @@ func selfTest()->Bool{
     checks["range_persistent"] = restored.chibiRoamMode == .free
     checks["size_persistent"] = restored.height == 360
     defaults.set("missing-character",forKey:"character");checks["unknown_character_falls_back"] = preferences.character == .chibi
+    checks["read_voice_default_companion"] = preferences.readVoice == .companion
+    preferences.readVoice = .system;checks["read_voice_persistent"] = restored.readVoice == .system
+    defaults.set("unknown-voice",forKey:"readVoice");checks["unknown_read_voice_falls_back"] = preferences.readVoice == .companion
     let text=try! JSONSerialization.data(withJSONObject:checks,options:[.prettyPrinted,.sortedKeys]);print(String(data:text,encoding:.utf8)!)
     return checks.values.allSatisfy{$0}
 }
@@ -513,6 +562,7 @@ if let index=CommandLine.arguments.firstIndex(of:"--export-icon"),CommandLine.ar
     };exit(1)
 }
 if CommandLine.arguments.contains("--self-test") {exit(selfTest() ? 0:1)}
+if CommandLine.arguments.contains("--tts-check") {exit(neuralSpeechCheck() ? 0:1)}
 let app=NSApplication.shared
 var instanceGuard:SingleInstanceGuard?
 if !CommandLine.arguments.contains("--ui-check") {
