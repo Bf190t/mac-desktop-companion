@@ -46,4 +46,6 @@ __pycache__/
 /local-assets/
 *.aiff
 *.wav
+# The companion's synthetic reading-voice sample is the one audio file that ships (see voice/companion_voice.json).
+!/voice/companion_voice.wav
 *.m4a

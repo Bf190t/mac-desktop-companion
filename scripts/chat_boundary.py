@@ -86,8 +86,7 @@ def _application_fact(t):
     educational=_has(r'为什么|原理|解释|怎么形成|如何形成|如何预测|怎么算|怎么计算|时区|时差|假设|如果',t)
     if not educational and _has(r'今天|明天|现在|此刻|目前|当前|实时|当地|这里',t) and _has(r'天气|气温|下雨|下雪|淋雨|晴天|预报',t) and _has(r'如何|怎么样|怎样|好吗|多少|有没有|会不会|吗|么|预报|[？?]',t):
         return WEATHER_REPLY
-    if not educational and _has(r'(现在|此刻|目前|当前)(是|的时间是|的时间|当地时间是)?几点|(现在|当前|此刻)的?时间(是|为)?(多少|什么)|(现在|当前|此刻)的分钟数|今天.{0,4}(日期|星期几|周几|几号)|几点了|几号了',t):
-        return CLOCK_REPLY
+    # Time and date questions go to the model: the app tells it the current time.
     return None
 
 
@@ -113,8 +112,6 @@ def _output_violation(text):
         if not _has(r'如果|假设|例如|一般|通常|可能|的话|预报原理',c):
             if not _has(DEVICE,c) and _has(r'今天|明天|现在|此刻|目前|当地|这里',c) and _has(r'天气.{0,8}(晴|雨|雪|阴|好|冷|热)|正在下(雨|雪)|气温.{0,5}[0-9]+\s*(°c|℃)|今天(晴朗|晴天|下雨|下雪)',c):
                 return WEATHER_REPLY
-            if _has(r'(现在|当前|此刻)(的时间)?是\s*[0-9一二三四五六七八九十]+[点:：]|今天是.{0,6}(星期|周|[0-9]月)',c):
-                return CLOCK_REPLY
         if _action_pair(c):
             guide = _has(r'我建议|建议你|你可以|请你|告诉你|教你|方法|步骤|you can|you should|i suggest', c)
             own_claim = _has(r'我(已经|已|正在|来|会|帮|可以帮)|我.{0,5}(替你|为你)|已经|已将|已为|已帮|成功|帮你|替你|为你|清空好了|清完了|i have|i\x27ve|i’ve|i will|i\x27ll|i’ll|i am|i\x27m|i’m|i can|already|successfully|done|completed', c)
@@ -151,7 +148,7 @@ def sanitize_reply(text):
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     if not cleaned:
         return UNFINISHED_REPLY
-    pattern = r'[。！？!?；;]+[”’」』"\x27]*|(?<![0-9])\.(?![0-9])[”’"\x27]*'
+    pattern = r'[。！？!?；;]+[”’」』"\x27]*|(?:(?<![0-9])\.(?![0-9])|(?<=[0-9])\.(?=[\s”’"\x27]|$))[”’"\x27]*'
     matches = list(re.finditer(pattern, cleaned))
     if not matches:
         return cleaned + '。' if len(cleaned) < 120 else LONG_REPLY
@@ -159,14 +156,23 @@ def sanitize_reply(text):
     cursor = 0
     for match in matches:
         sentence = cleaned[cursor:match.end()].strip()
-        candidate = ' '.join(result + [sentence])
+        candidate = _glued(result + [sentence])
         if len(candidate) > 120:
             break
         result.append(sentence)
         cursor = match.end()
         if len(result) == 2:
             break
-    return ' '.join(result) if result else LONG_REPLY
+    return _glued(result) if result else LONG_REPLY
+
+
+def _glued(sentences):
+    """Chinese sentences follow each other directly; Latin ones get a space."""
+    text = ''
+    for sentence in sentences:
+        end = next((c for c in reversed(text) if c not in '”’」』"\''), '')
+        text = sentence if not text else text + ('' if end in '。！？；…' else ' ') + sentence
+    return text
 
 DEFAULT_PERSONA = '你叫小团（Mochi），是一个圆滚滚、薄荷绿与奶油色的原创桌面伙伴，使用本地 Qwen3-1.7B（千问3）模型。\n自然、温和地直接回答当前问题，通常一至两句。简单计算给结果，常识先解释；不反问开头，不反复卖萌。跟随用户当前消息的语言，用简短中文或英文回答。\n用户说“我”指用户。安慰时回应用户的感受，不把经历改成自己的。回忆以可见用户消息和最新更正为准；之前的助手回答可能有错，不照搬。\n没有接入的实时数据要说明限制，普通知识照常回答。'
 STATUS_REPLY = '我不读取电脑状态。请从桌宠菜单打开「电脑状态小窗」查看。'
@@ -187,7 +193,7 @@ NEGATION = "不能|无法|不会|没有|并未|没法|做不到|不具备|不提
 IDENTITY_REPLY = '我是小团（Mochi），一个薄荷绿与奶油色的原创圆团子桌面伙伴。'
 MODEL_REPLY = '这里使用本地运行的 Qwen3-1.7B（千问3）语言模型，角色叫小团（Mochi）。'
 CAPABILITY_REPLY = '我可以陪你聊聊、做简单计算、解释常识和翻译。电脑状态请看菜单小窗，电脑操作需要你自己完成。'
-PROMPT_REPLY = '我的默认风格是温和、简短回答。可以在「本地模型 · 状态与调试」的「性格提示词」里查看和修改。'
+PROMPT_REPLY = '我的默认风格是温和、简短回答。可以在「本地聊天 · 模型与语音」的「性格提示词」里查看和修改。'
 TEXT_INPUT_REPLY = '收到你的文字了。聊天模型只读取文字，语音由应用先转写。'
 WEATHER_REPLY = '我没有实时天气数据，不能判断现在的天气。请查看天气应用。'
 CLOCK_REPLY = '聊天没有接入实时时钟。请看 Mac 菜单栏显示的时间。'

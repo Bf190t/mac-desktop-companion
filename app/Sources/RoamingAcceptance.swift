@@ -17,7 +17,6 @@ func runRoamingAcceptance(_ app: AppDelegate,
     let priorQuit = app.isQuitting
     let initialWorker = app.chat.hasWorker
     let inspectorVisible = app.chatInspector?.window.isVisible == true
-    let voiceVisible = app.voiceWindow?.window.isVisible == true
     guard !initialWorker, !app.voice.isRecording, !app.voice.isProcessing, !app.voice.isSpeaking else {
         record("roam_qa_requires_no_existing_model_or_audio", false); completion(); return
     }
@@ -25,7 +24,7 @@ func runRoamingAcceptance(_ app: AppDelegate,
     record("roam_mode_initially_off", !app.roamingEnabled)
     app.setRoaming(false); app.prefs.userPaused = false; app.prefs.petHidden = false
     app.hideBubble(); app.chatBubbleUntil = 0; app.dragging = false
-    app.chatInspector?.window.close(); app.voiceWindow?.window.close()
+    app.chatInspector?.window.close()
     app.selectCharacter(.chibi)
     guard app.prefs.character == .chibi else {
         record("roam_chibi_artwork_loads", false)
@@ -71,12 +70,11 @@ func runRoamingAcceptance(_ app: AppDelegate,
     record("roam_unlock_does_not_start_model_or_audio", !app.chat.hasWorker && !app.voice.isRecording && !app.voice.isSpeaking)
 
     app.showChatInspector(); app.chatInspector?.window.setFrameAutosaveName(""); app.chatInspector?.window.orderFront(nil)
-    app.showVoiceExperiment(); app.voiceWindow?.window.setFrameAutosaveName(""); app.voiceWindow?.window.orderFront(nil)
     app.syncChatVisibility()
     record("roam_two_diagnostic_windows_use_no_extra_worker", app.diagnosticVisible && !app.chat.hasWorker && app.interactionDecision.canSendFromDiagnostic)
+    // One merged chat/voice window now; it alone owns the model while open.
+    record("roam_other_diagnostic_window_remains_owner", app.diagnosticVisible && !app.interactionDecision.shouldReleaseModel)
     app.chatInspector?.window.close(); app.syncChatVisibility()
-    record("roam_other_diagnostic_window_remains_owner", app.voiceWindow?.window.isVisible == true && !app.interactionDecision.shouldReleaseModel)
-    app.voiceWindow?.window.close(); app.syncChatVisibility()
     record("roam_last_diagnostic_close_releases_owner", !app.diagnosticVisible && app.interactionDecision.shouldReleaseModel)
     app.setRoaming(false)
     record("roam_disabled_restores_user_preferences", !app.roamingEnabled && app.effectiveChatEnabled && !app.effectiveClickThrough && !app.pet.ignoresMouseEvents)
@@ -114,7 +112,6 @@ func runRoamingAcceptance(_ app: AppDelegate,
             app.chatInputView?.input.string = originalDraft
             app.selectCharacter(character); app.refreshRuntime()
             if inspectorVisible { app.showChatInspector(); app.chatInspector?.window.orderFront(nil) }
-            if voiceVisible { app.showVoiceExperiment(); app.voiceWindow?.window.orderFront(nil) }
             app.syncChatVisibility()
             record("roam_qa_restores_preferences", app.prefs.character == character && app.prefs.chatEnabled == chat && app.prefs.clickThrough == through && !app.roamingEnabled)
             completion()

@@ -16,7 +16,7 @@ extension AppDelegate {
         if enabled {
             chatInput?.orderOut(nil)
             voice.cancelCapture(reason: L("散步时暂停语音输入。", "Voice input pauses during roaming."))
-            voice.stopSpeaking(); speech?.stopSpeaking(at: .immediate)
+            voice.stopSpeaking(); stopChimeSpeech()
         }
         refreshRuntime()
     }
@@ -45,9 +45,9 @@ extension AppDelegate {
             controller.onUpdate = { [weak self] state in self?.applyRoam(state) }
             roamController = controller
         }
-        var engine = roamController?.engine ?? PetRoamEngine(ground: ground, visibleFrame: screenForPet().visibleFrame,
+        var engine = roamController?.engine ?? PetRoamEngine(ground: ground, visibleFrame: petVisibleFrame,
                                                             artworkSize: pet.frame.size, mode: prefs.chibiRoamMode)
-        engine.configure(ground: ground, visibleFrame: screenForPet().visibleFrame,
+        engine.configure(ground: ground, visibleFrame: petVisibleFrame,
                          artworkSize: pet.frame.size, mode: prefs.chibiRoamMode)
         applyRoam(engine)
         roamController?.start(engine: engine)

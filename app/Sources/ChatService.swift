@@ -6,6 +6,9 @@ struct PetChatLine {
     let role: String
     let text: String
     var eligible = true
+    /// False for canned application replies (and the question they answered). They stay
+    /// visible but are not sent back to the model, so refusals do not pile up as examples.
+    var inModelContext = true
 }
 
 /// Owns stdin handles on one queue. A retired destination remains distinct from
@@ -110,6 +113,9 @@ final class PetChatService {
     var idleSeconds: Int { longResidency ? 1800 : 120 }
     var customPersona = ""
     var persona: String { customPersona.isEmpty ? ChatBoundary.defaultPersona : customPersona }
+    /// What the companion remembers about the user; learned from clear self-statements, editable.
+    var profile = UserProfile()
+    var onProfileLearned: ((UserProfile,[String]) -> Void)?
     private var omitted = 0
     private var worker: Process?
     private var token: UUID?
@@ -156,21 +162,26 @@ final class PetChatService {
             status=L("请发送 1–5000 字的消息。", "Please send a message of 1–5000 characters."); changed(); return false
         }
         append(PetChatLine(role:"user",text:text))
+        let learned=profile.learn(from:text)
+        if !learned.isEmpty {onProfileLearned?(profile,learned)}
         if let fixed=ChatBoundary.replyBeforeInference(text) {
-            append(PetChatLine(role:"assistant",text:fixed))
+            let keep=ChatBoundary.keepsInModelContext(fixed)
+            if !keep {excludeLastUserFromModelContext()}
+            append(PetChatLine(role:"assistant",text:fixed,inModelContext:keep))
             status=L("这条由应用直接说明，未请求模型。", "This is an app-provided explanation, without a model request.")
             if worker != nil { write(["action":"activity","kind":"user_input"]) }
-            onReply?(fixed); changed(); return true
+            onReply?(Self.withCrisisSupport(fixed,for:text)); changed(); return true
         }
         guard #available(macOS 26.0, *) else {
-            status=L("此聊天组件需要 macOS 26 或更新版本；其他桌宠功能可继续使用。", "Local chat requires macOS 26 or later. Other companion features remain available.");onReply?(status);changed();return true
+            status=L("此聊天组件需要 macOS 26 或更新版本；其他桌宠功能可继续使用。", "Local chat requires macOS 26 or later. Other companion features remain available.");onReply?(Self.withCrisisSupport(status,for:text));changed();return true
         }
         guard ModelInstallation.shared.isInstalled else {
-            status=L("尚未安装可选模型。请从「本地模型」窗口点击「安装本地聊天」。", "Optional model not installed. Open Local Model and choose Install Local Chat.");onReply?(status);changed();return true
+            status=L("尚未安装可选模型。请在「本地聊天 · 模型与语音」窗口点「安装可选聊天模型…」。", "Optional model not installed. In Local chat · Model & voice, click Install optional chat model….");onReply?(Self.withCrisisSupport(status,for:text));changed();return true
         }
-        let history=lines.filter{$0.eligible}.map{["role":$0.role,"content":$0.text]}
+        let history=lines.filter{$0.eligible && $0.inModelContext}.map{["role":$0.role,"content":$0.text]}
         let id=UUID().uuidString
-        let request:[String:Any]=["action":"chat","id":id,"mode":"companion","messages":history,"history_omitted_messages":omitted,"persona_override":persona]
+        let prompt=CompanionPrompt.request(style:persona,history:history,earlierOmitted:omitted,notes:[profile.promptText].compactMap{$0},turnNote:[TimeMath.hint(for:text),ChatBoundary.needsCrisisSupport(text) ? CompanionPrompt.crisisNote:nil].compactMap{$0}.joined(separator:"\n").nilIfEmpty)
+        let request:[String:Any]=["action":"chat","id":id,"mode":"companion","messages":prompt.messages,"system":prompt.system,"examples":prompt.examples,"history_omitted_messages":omitted]
         guard let data=try? JSONSerialization.data(withJSONObject:request),data.count < 1000000 else {
             status=L("对话过长，请先清空对话。", "The conversation is too long. Please clear it first.");changed();return true
         }
@@ -231,7 +242,7 @@ final class PetChatService {
                     let detail=String(self.diagnostics.split(separator:"\n").last.map(String.init)?.prefix(180) ?? "")
                     self.status += L("\n退出码 \(ended.terminationStatus)", "\nExit code \(ended.terminationStatus)") + (detail.isEmpty ? "":"："+detail)
                 }
-                if hadPending && self.intentionalExit == nil {self.onReply?(L("这次模型意外停下了。请打开本地模型状态查看原因，再试一次。", "The model stopped unexpectedly. Check Local Model status, then try again."))}
+                if hadPending && self.intentionalExit == nil {self.onReply?(Self.withCrisisSupport(L("这次模型意外停下了。请打开「本地聊天 · 模型与语音」查看原因，再试一次。", "The model stopped unexpectedly. Check Local chat · Model & voice, then try again."),for:self.lastUserText))}
                 self.changed()
             }
         }
@@ -277,11 +288,16 @@ final class PetChatService {
             pendingRender?.cancel();pendingRender=nil
             if let t=e["text"] as? String {draft=t}
             let reason=e["finish_reason"] as? String ?? "unknown"
-            let isComplete = reason == "stop" && !cancelled
+            // A reply cut by the token cap still counts when it has a finished sentence;
+            // sanitizeReply keeps only complete sentences and drops the unfinished tail.
+            let capped=reason == "length" && ChatBoundary.hasCompleteSentence(draft)
+            let isComplete = (reason == "stop" || capped) && !cancelled
             let reply:String
             if isComplete {
                 reply=ChatBoundary.sanitizeReply(draft)
-                append(PetChatLine(role:"assistant",text:reply))
+                let keep=ChatBoundary.keepsInModelContext(reply)
+                if !keep {excludeLastUserFromModelContext()}
+                append(PetChatLine(role:"assistant",text:reply,inModelContext:keep))
             } else {finishIncomplete();reply=cancelled ? L("先停在这里。你可以继续发消息。", "Stopped here. You can send another message."):L("这句话没说完整，换个短一点的问题试试吧。", "That reply was incomplete. Try a shorter question.")}
             draft="";currentID=nil;idleRemaining=Double(idleSeconds)
             let total=ProcessInfo.processInfo.systemUptime-started
@@ -292,16 +308,28 @@ final class PetChatService {
             if reason == "memory_limit" {release("memory_limit")}
             // All previous-request mutation must finish before callbacks: a
             // callback may synchronously submit the next request or start TTS.
-            onReply?(reply);changed();return
+            onReply?(Self.withCrisisSupport(reply,for:lastUserText));changed();return
         case "error":
-            finishIncomplete();currentID=nil;status=e["message"] as? String ?? L("本轮没有完成。", "This reply did not complete.");onReply?(L("这次没能完成回复。可以在本地模型状态中查看原因，再试一次。", "The reply could not complete. Check Local Model status, then try again."))
+            finishIncomplete();currentID=nil;status=e["message"] as? String ?? L("本轮没有完成。", "This reply did not complete.");let failed=L("这次没能完成回复。可以在「本地聊天 · 模型与语音」中查看原因，再试一次。", "The reply could not complete. Check Local chat · Model & voice, then try again.")
+            // Even when the model fails, someone in crisis still gets the support line.
+            onReply?(ChatBoundary.needsCrisisSupport(lastUserText) ? L("我在这儿，你说的话我很在意。", "I'm here, and what you said matters to me.")+"\n"+ChatBoundary.crisisSupport : failed)
         case "idle_exit":intentionalExit="idle_timeout";stopping=true;status=L("闲置时间已到，正在释放模型。", "Idle timeout reached. Unloading the model.")
         case "configured","activity_ack":break
+        case "preload_failed":status=L("模型预加载失败：", "Could not preload the model: ")+(e["message"] as? String ?? "")
         case "exiting":
             if intentionalExit == nil {intentionalExit=e["reason"] as? String};stopping=true
         default:break
         }
         changed()
+    }
+    private var lastUserText: String { lines.last(where:{$0.role == "user"})?.text ?? "" }
+    /// The support line is shown (and read aloud) after the reply but never stored in history,
+    /// so the model does not start repeating hotline numbers by itself.
+    static func withCrisisSupport(_ reply:String,for userText:String) -> String {
+        ChatBoundary.needsCrisisSupport(userText) ? reply+"\n"+ChatBoundary.crisisSupport : reply
+    }
+    private func excludeLastUserFromModelContext() {
+        if let index=lines.indices.last,lines[index].role == "user" {lines[index].inModelContext=false}
     }
     private func finishIncomplete() {
         pendingRender?.cancel();pendingRender=nil
@@ -321,8 +349,17 @@ final class PetChatService {
         write(["action":"stats"])
     }
     private var lastTyping:TimeInterval=0
+    /// Starts the worker and loads the model ahead of the first message (typing or a mic click),
+    /// so the reply does not wait for loading. Nothing is generated.
+    func prewarm() {
+        guard canSend,!suspended,!memoryPressureBlocked,ModelInstallation.shared.isInstalled else{return}
+        guard #available(macOS 26.0, *) else{return}
+        if worker == nil {startWorker()}
+        if worker?.isRunning == true,!loaded {write(["action":"preload"])}
+    }
     func userTyped() {
-        guard hasWorker,!stopping else{return}
+        if !hasWorker {prewarm();return}
+        guard !stopping else{return}
         let now=ProcessInfo.processInfo.systemUptime
         guard now-lastTyping >= 2 else{return}
         lastTyping=now;write(["action":"activity","kind":"user_input"])
@@ -377,4 +414,8 @@ final class PetChatService {
     }
     func testingEvent(_ event:[String:Any]) {handle(event)}
     #endif
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

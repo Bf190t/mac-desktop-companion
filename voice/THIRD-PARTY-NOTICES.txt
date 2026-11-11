@@ -1,0 +1,132 @@
+Desktop Companion downloads these optional reading-voice components only on user request.
+They are not covered by the project's MIT license; their original licenses apply.
+
+Python runtime: CPython 3.12.15, distributed by astral-sh/python-build-standalone (same pinned
+runtime as the optional chat). Pinned URL, size and SHA-256: runtime-manifest.json.
+
+Model: mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit (base model Qwen/Qwen3-TTS-12Hz-0.6B-Base), Apache-2.0.
+Pinned revision and per-file SHA-256: model-manifest.json. The full Apache-2.0 text is MODEL-LICENSE.txt.
+
+Companion voice: companion_voice.wav was generated once from a text description with
+mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit (Apache-2.0); see companion_voice.json. It is a
+synthetic voice, not a recording of any real person. The reading voice clones only its timbre.
+
+The downloaded wheels retain their *.dist-info license/metadata directories. Only prebuilt PyPI
+wheels with the pinned SHA-256 hashes in requirements-lock.txt are installed; no remote model code
+is executed, and the voice helper runs with network access denied.
+
+可选朗读声音的依赖与来源 / Optional reading-voice dependencies (license as declared by each package):
+
+annotated-doc 0.0.5
+声明许可 / License: MIT
+
+anyio 4.16.0
+声明许可 / License: MIT
+
+cffi 2.1.1
+声明许可 / License: MIT-0
+
+click 8.5.0
+声明许可 / License: BSD-3-Clause
+
+filelock 4.2.6
+声明许可 / License: MIT
+
+fsspec 2026.9.0
+声明许可 / License: BSD-3-Clause
+
+h11 0.16.0
+声明许可 / License: MIT License
+
+hf-xet 1.8.0
+声明许可 / License: Apache-2.0
+
+httpcore2 2.16.0
+声明许可 / License: BSD-3-Clause
+
+httpx2 2.16.0
+声明许可 / License: BSD-3-Clause
+
+huggingface-hub 2.4.0
+声明许可 / License: Apache Software License
+
+idna 3.20
+声明许可 / License: BSD-3-Clause
+
+jinja2 3.1.6
+声明许可 / License: BSD License
+
+markdown-it-py 4.2.0
+声明许可 / License: MIT License
+
+markupsafe 3.0.4
+声明许可 / License: BSD-3-Clause
+
+mdurl 0.1.2
+声明许可 / License: MIT License
+
+miniaudio 1.71
+声明许可 / License: MIT License
+
+mlx 0.32.4
+声明许可 / License: MIT
+
+mlx-audio 0.6.5
+声明许可 / License: MIT
+
+mlx-metal 0.32.4
+声明许可 / License: MIT
+
+numpy 2.5.4
+声明许可 / License: BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0
+
+packaging 26.3
+声明许可 / License: Apache-2.0 OR BSD-2-Clause
+
+pycparser 3.12
+声明许可 / License: BSD-3-Clause
+
+pygments 2.21.0
+声明许可 / License: BSD-2-Clause
+
+pyyaml 6.0.3
+声明许可 / License: MIT License
+
+regex 2026.9.29
+声明许可 / License: Apache-2.0 AND CNRI-Python
+
+rich 15.0.0
+声明许可 / License: MIT License
+
+safetensors 0.8.0
+声明许可 / License: Apache Software License
+
+scipy 1.18.1
+声明许可 / License: BSD License
+
+sentencepiece 0.2.2
+声明许可 / License: Apache-2.0
+
+shellingham 1.5.4
+声明许可 / License: ISC License (ISCL)
+
+sounddevice 0.5.6
+声明许可 / License: MIT
+
+tokenizers 0.23.3
+声明许可 / License: Apache Software License
+
+tqdm 4.70.1
+声明许可 / License: MPL-2.0 AND MIT
+
+transformers 5.22.1
+声明许可 / License: Apache 2.0 License
+
+truststore 0.10.5
+声明许可 / License: MIT
+
+typer 0.27.3
+声明许可 / License: MIT
+
+typing-extensions 4.16.0
+声明许可 / License: PSF-2.0

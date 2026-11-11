@@ -14,7 +14,8 @@ A small native macOS desktop companion with a friendly original mascot, readable
 - Optional hourly speech bubbles, hide/pause controls, and complete quit from the menu bar.
 - Chinese and English interface settings.
 - Experimental roaming, off by default. Roaming hides the input field and makes the pet ignore mouse clicks; switching it off restores your previous settings.
-- Optional local Qwen3-1.7B text chat. Model files and their runtime are installed separately. Experimental Chinese push-to-talk transcription and system-voice reading remain optional; there is no wake-word listener.
+- Optional local Qwen3-1.7B text chat. Model files and their runtime are installed separately. Mochi knows the current time, works out "be there by 8:30, 40 minutes away, when should I leave?" exactly, and remembers what you tell it about yourself (editable, kept on your Mac). It never plays a romantic partner. When a message sounds like someone is struggling, the reply ends with a crisis line for the Mac's region.
+- Optional voice: click once to record and again to stop, then check the transcript before sending. Recognition is on-device and follows the interface language; there is no wake-word listener. Replies can be read by a system voice, or by **Mochi's own voice** (an optional on-device neural voice), which can also say the hourly time.
 
 ## Requirements
 
@@ -22,7 +23,8 @@ A small native macOS desktop companion with a friendly original mascot, readable
 |---|---|
 | Desktop companion and monitors | Apple Silicon Mac, macOS 14 or newer |
 | Optional local text model | Apple Silicon, macOS 26 or newer, at least 3 GiB free space during optional installation |
-| Experimental voice input | Microphone and speech-recognition permission, plus an available on-device recognizer |
+| Voice input | Microphone permission. macOS 26 or newer uses the system's on-device recognizer (it may download its language model once); macOS 14–15 also needs Speech permission and Dictation turned on |
+| Optional reading voice | Apple Silicon, macOS 14 or newer, about 2.5 GB download with at least 4 GiB free during installation |
 | Build from source | Xcode Command Line Tools with a compatible macOS SDK |
 
 There is no Intel release. Sensor and accessory support varies with the hardware and macOS version. Missing information is displayed as unavailable rather than estimated.
@@ -62,7 +64,16 @@ The core app is useful without chat. If you choose to install the optional model
 - The conversation stays in memory. It is not a system-control agent: the model does not receive your computer metrics, accessory records, screen, or files, and it cannot execute actions.
 - This is a small model. It can misunderstand, invent facts, or lose details from a long conversation; the prompt and output filters do not guarantee factual accuracy.
 
-[Model and data details](docs/PRIVACY.md) explain the local data, permissions, and experimental voice behavior.
+[Model and data details](docs/PRIVACY.md) explain the local data, permissions, and voice behavior.
+
+## Optional reading voice
+
+Replies and hourly announcements can be read by Mochi's own voice instead of a system voice. Open **Local chat · Model & voice → Install reading voice…**; until then, or whenever the voice is unavailable, a system voice reads instead.
+
+- Model: [Qwen3-TTS 0.6B Base](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base), using the pinned [MLX community 8-bit conversion](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/tree/50f45ef0047cde7e84c2ef04326acb8ada2436a7), Apache 2.0. About 2 GB of model files plus a pinned Python runtime and hash-locked packages, stored in the app's own Application Support folder.
+- Mochi's voice was designed once from a text description with Qwen3-TTS VoiceDesign and is cloned by timbre from the short synthetic sample [voice/companion_voice.wav](voice/companion_voice.wav). It is not a recording of any person.
+- Speech streams as it is generated: on an M4 MacBook Air the first sound arrives in about 0.2–0.4 s, about 2× faster than real time. The installer records the 24 hourly announcements in Chinese and English once, so a chime never loads the model.
+- The voice helper runs with network access denied, loads when you start typing or recording, and unloads after 5 idle minutes or under memory pressure. If it fails before the first sound, the system voice reads that reply.
 
 ## Reading the numbers
 

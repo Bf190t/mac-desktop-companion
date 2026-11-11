@@ -116,8 +116,25 @@ def persona(mode,override=None):
     if not value or len(value)>1500:raise ValueError('性格提示词需为1至1500字，请在性格设置中缩短。')
     return value
 
+OMITTED_NOTE_ZH='较早的部分对话因长度限制已省略。找不到依据时请说明当前可见内容不足，不猜测旧信息。'
+OMITTED_NOTE_EN="Earlier parts of the conversation were left out for length. If something is not in what you can see, say so instead of guessing."
+
+def validate_prompt_parts(system,examples):
+    """The app builds the companion prompt (persona, limits, time, memory) and its example turns."""
+    if system is not None and (not isinstance(system,str) or not system.strip() or len(system)>4000):
+        raise ValueError('系统提示格式不正确。')
+    if examples is None:return []
+    if not isinstance(examples,list) or len(examples)>6:raise ValueError('示范对话格式不正确。')
+    pairs=[]
+    for pair in examples:
+        if not isinstance(pair,list) or len(pair)!=2 or not all(isinstance(t,str) and t.strip() and len(t)<=400 for t in pair):
+            raise ValueError('示范对话格式不正确。')
+        pairs+= [{'role':'user','content':pair[0].strip()},{'role':'assistant','content':pair[1].strip()}]
+    return pairs
+
 def validate_chat_request(req):
     validate_messages(req.get('messages'))
+    validate_prompt_parts(req.get('system'),req.get('examples'))
     mode=req.get('mode','persona')
     if mode not in ('persona','plain','companion'):raise ValueError('聊天模式不正确。')
     if 'persona_override' in req:
@@ -177,7 +194,7 @@ def read_input():
                     residency.touch('user_input');wake_service()
                 emit_status('activity_ack',id=req.get('id'));continue
             if action=='chat':validate_chat_request(req)
-            elif action!='stats':raise ValueError('不支持的实验请求。')
+            elif action not in ('stats','preload'):raise ValueError('不支持的实验请求。')
             with state_lock:
                 if closing.is_set():return
                 requests.put_nowait(req)
@@ -218,21 +235,45 @@ class RequestSample:
         cpu=sum(process.cpu_times()[:2])-self.cpu_start
         return {'request_peak_rss_mib':round(self.peak/1024**2,1),'request_peak_footprint_mib':round(self.peak_footprint/1024**2,1),'cpu_seconds':round(cpu,3),'mean_cpu_percent':round(cpu/max(duration,.001)*100,1),'samples':self.samples}
 
-def prepare_prompt(messages,mode,history_omitted_messages=0,persona_override=None):
+def prepare_prompt(messages,mode,history_omitted_messages=0,persona_override=None,system=None,examples=None):
     if not isinstance(history_omitted_messages,int) or isinstance(history_omitted_messages,bool) or not 0<=history_omitted_messages<=1000000000:
         raise ValueError('历史省略计数不正确。')
     history=validate_messages(messages)
+    shots=validate_prompt_parts(system,examples)
     initial_count=len(messages)
     while True:
-        prompt=persona(mode,persona_override) if mode=='companion' else persona(mode)
-        if initial_count>len(history) or history_omitted_messages:
-            prompt+='\n较早的部分对话因长度限制已省略。找不到依据时请说明当前可见内容不足，不猜测旧信息。'
-        combined=[{'role':'system','content':prompt},*history]
+        if system is not None:
+            prompt=system.strip()
+            # The app already notes omissions it made; history dropped here gets the same note.
+            if initial_count>len(history) and OMITTED_NOTE_ZH not in prompt and OMITTED_NOTE_EN not in prompt:
+                prompt+='\n'+(OMITTED_NOTE_ZH if any('\u4e00'<=c<='\u9fff' for c in prompt) else OMITTED_NOTE_EN)
+        else:
+            prompt=persona(mode,persona_override) if mode=='companion' else persona(mode)
+            if initial_count>len(history) or history_omitted_messages:
+                prompt+='\n'+OMITTED_NOTE_ZH
+        # Example turns sit between the system prompt and the history, so trimming never drops them.
+        combined=[{'role':'system','content':prompt},*shots,*history]
         tokens=tokenizer.apply_chat_template(combined,tokenize=True,return_dict=False,add_generation_prompt=True,enable_thinking=False)
         if len(tokens)<=MAX_PROMPT:return tokens,initial_count-len(history)
         if len(history)<=1:raise ValueError('这段文字超过当前短对话长度，请缩短后再发。')
         history=history[1:]
         while len(history)>1 and history[0]['role']!='user':history=history[1:]
+
+def handle_preload():
+    """Loads the model ahead of the first message (the user started typing or recording), so the
+    reply does not wait for loading. It counts as activity for the idle timer; it generates nothing."""
+    global model,tokenizer
+    if model is not None or closing.is_set():return
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            from mlx_lm import load
+        emit('loading',message='正在校验并加载本地模型…')
+        t=time.perf_counter();verify_model()
+        with contextlib.redirect_stdout(sys.stderr):
+            model,tokenizer=load(str(ROOT/'model'),tokenizer_config={'trust_remote_code':False,'local_files_only':True},trust_remote_code=False,lazy=False)
+        emit_status('loaded',load_s=round(time.perf_counter()-t,3),**memory_metrics())
+    except Exception as error:
+        emit_status('preload_failed',message=str(error)[:200])
 
 def handle_chat(req):
     global model,tokenizer,active_id
@@ -261,7 +302,7 @@ def handle_chat(req):
             load_s=time.perf_counter()-t
             emit('loaded',id=request_id,load_s=round(load_s,3),**memory_metrics())
         if req.get('mode')=='companion':
-            tokens,dropped=prepare_prompt(req['messages'],'companion',req.get('history_omitted_messages',0),req.get('persona_override'))
+            tokens,dropped=prepare_prompt(req['messages'],'companion',req.get('history_omitted_messages',0),req.get('persona_override'),req.get('system'),req.get('examples'))
         elif req.get('history_omitted_messages',0):
             tokens,dropped=prepare_prompt(req['messages'],req.get('mode','persona'),req['history_omitted_messages'])
         else:
@@ -271,7 +312,7 @@ def handle_chat(req):
         generation_start=time.perf_counter()
         output_limit=COMPANION_MAX_OUTPUT if req.get('mode')=='companion' else MAX_OUTPUT
         emit_status('generating',id=request_id,prompt_tokens=len(tokens),dropped_messages=dropped,context_used_messages=len(req['messages'])-dropped,max_output_tokens=output_limit)
-        iterator=stream_generate(model,tokenizer,tokens,max_tokens=output_limit,sampler=make_sampler(temp=.7,top_p=.8,top_k=20),logits_processors=make_logits_processors(repetition_penalty=1.08,repetition_context_size=64),prefill_step_size=256,max_kv_size=2304)
+        iterator=stream_generate(model,tokenizer,tokens,max_tokens=output_limit,sampler=make_sampler(temp=.7,top_p=.8,top_k=20),logits_processors=make_logits_processors(presence_penalty=1.0,presence_context_size=64),prefill_step_size=256,max_kv_size=2304)
         for response in iterator:
             now=time.perf_counter();last_response=response
             if first_s is None and response.text:first_s=now-started
@@ -312,6 +353,7 @@ def serve_requests():
         if action=='_residency_update':continue
         if action=='stats':emit_status('stats',**memory_metrics());continue
         if action=='chat':handle_chat(req)
+        if action=='preload':handle_preload()
     emit_status('exiting',reason=exit_reason or 'client_quit',model_loaded=model is not None)
 
 def cli_idle_seconds(value):
