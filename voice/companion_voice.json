@@ -1,0 +1,14 @@
+{
+  "name": "Mochi's reading voice",
+  "made_with": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit @ 1c6c0ff58c43afa8df571facde2efa077efd85e2 (Apache-2.0), mlx-audio 0.6.4",
+  "speaker": "serena (one of the model's built-in speakers)",
+  "instruct": "温和、清晰的女声。全程由同一位讲书人，用自然平稳的普通话连续讲述。保持相同音色、音高范围、共鸣和语速；按标点自然停顿，不变换角色，不模仿人物，不突然提高音调或改变情绪。",
+  "sampling": {"temperature": 0.6, "top_p": 0.9, "top_k": 40, "repetition_penalty": 1.05},
+  "seed": 6,
+  "text": "那天傍晚，雨终于停了。他推开窗，看见街对面的灯一盏一盏亮起来，心里忽然安静了许多。",
+  "format": "16-bit PCM WAV, 24 kHz mono, 12.64 s",
+  "sha256": "8e7265e737c555733b2fce158273328bf11a1d195163605f904fc6bae4a2a06c",
+  "used_as": "speaker embedding (x-vector, no reference text) for mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit",
+  "since": "0.2.1 (replaces the earlier VoiceDesign sample)",
+  "note": "Generated with the model's built-in speaker Serena, chosen by ear from eight seeds. It is not a recording of a person and is not modelled on any real person or existing character."
+}

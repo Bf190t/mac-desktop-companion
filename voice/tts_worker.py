@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Reading-voice helper for Desktop Companion: Qwen3-TTS 0.6B through MLX, fully offline.
 
-The companion's voice ("companion") was designed once with the Qwen3-TTS 1.7B VoiceDesign model (a clear,
-slightly high young voice with an even tone) and is cloned here by its speaker embedding with the 0.6B
-Base model and companion_voice.wav: the timbre only, the model's own rhythm. CustomVoice models still
+The companion's voice ("companion") is one fixed sample, companion_voice.wav (Qwen3-TTS's built-in
+speaker Serena since 0.2.1), cloned here by its speaker embedding with the 0.6B Base model: the
+timbre only, the model's own rhythm. CustomVoice models still
 work with their built-in speakers.
 
 The app starts this with the optional voice runtime it installed under Application Support and talks
@@ -269,7 +269,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--parent-pid", type=int, default=0)
-    parser.add_argument("--voice-ref", help="reference audio of the companion's designed voice (Base models)")
+    parser.add_argument("--voice-ref", help="reference audio of the companion's voice sample (Base models)")
     parser.add_argument("--deps", help="folder with the installed Python packages")
     args = parser.parse_args()
     for key in ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE", "HF_HUB_DISABLE_TELEMETRY", "DO_NOT_TRACK"):

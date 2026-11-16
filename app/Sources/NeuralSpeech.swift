@@ -2,13 +2,13 @@ import Foundation
 import AVFoundation
 
 /// Optional reading voice: replies read aloud with Qwen3-TTS 0.6B (Base model, cloning the companion's
-/// designed voice by its speaker embedding). The model runs in a helper process (Resources/Voice/
+/// voice sample by its speaker embedding). The model runs in a helper process (Resources/Voice/
 /// tts_worker.py) inside its own runtime under Application Support, installed from the chat window.
 /// Audio comes back in ~0.3 s chunks and plays as it arrives. When anything is missing or fails,
 /// PetVoiceService reads the reply with the system voice instead, so the companion never goes quiet.
 
-/// The voice used for replies. `.companion` is Mochi's voice: designed once with Qwen3-TTS
-/// VoiceDesign (a clear, slightly high young voice with an even tone) and cloned at runtime from
+/// The voice used for replies. `.companion` is Mochi's voice: one sample from Qwen3-TTS's built-in
+/// speaker Serena (since 0.2.1), cloned by timbre at runtime from the installed copy of
 /// Resources/Voice/companion_voice.wav. `.system` is macOS.
 enum ReadVoice: String, CaseIterable {
     case companion, system
@@ -24,7 +24,7 @@ enum ReadVoice: String, CaseIterable {
 /// so installing while the app runs works without a restart.
 struct NeuralSpeechInstall {
     let python: URL, model: URL, worker: URL, deps: URL
-    /// Reference audio of the companion's designed voice (cloned by speaker embedding).
+    /// Reference audio of the companion's voice: the installed copy of companion_voice.wav (cloned by speaker embedding).
     let voice: URL
     static var root: URL { ModelInstallation.voice.root }
     static var installHint: String { L("朗读声音还没装：在「本地聊天 · 模型与语音」里点「安装朗读声音…」，装好后不用重启。", "The reading voice is not installed: click Install reading voice… in Local chat · Model & voice. No restart needed afterwards.") }

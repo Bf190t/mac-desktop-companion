@@ -71,7 +71,7 @@ cd mac-desktop-companion
 回复和整点报时可以用小团自己的声音来念。在「本地聊天 · 模型与语音」里点「安装朗读声音…」；没装好之前，或者朗读声音暂时不可用时，改用系统声音念。
 
 - 模型：[Qwen3-TTS 0.6B Base](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base)，使用固定版本的 [MLX 社区 8bit 转换](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/tree/50f45ef0047cde7e84c2ef04326acb8ada2436a7)，Apache 2.0。约 2 GB 模型文件，加上固定版本的 Python 运行时和锁定哈希的依赖包，存放在本应用自己的 Application Support 目录。
-- 小团的声音是用 Qwen3-TTS 声音设计模型按一段文字描述造出来的，朗读时只按音色克隆这段合成样本 [voice/companion_voice.wav](voice/companion_voice.wav)，不是任何真人的录音。
+- 小团的声音来自 Qwen3-TTS 自带的说话人 Serena：朗读时只按音色克隆这段合成样本 [voice/companion_voice.wav](voice/companion_voice.wav)，不是任何真人的录音。（0.2.1 起；更早的版本用的是声音设计模型造的样本。）
 - 边生成边念：在 M4 MacBook Air 上第一声约 0.2–0.4 秒，比实时快约 2 倍。安装时一次录好中英文各 24 段整点报时，报时不用加载模型。
 - 朗读进程禁止联网；开始打字或录音时加载，闲置 5 分钟或内存紧张时释放。在出声之前出错的话，这一句改用系统声音念。
 

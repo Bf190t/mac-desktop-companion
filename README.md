@@ -71,7 +71,7 @@ The core app is useful without chat. If you choose to install the optional model
 Replies and hourly announcements can be read by Mochi's own voice instead of a system voice. Open **Local chat · Model & voice → Install reading voice…**; until then, or whenever the voice is unavailable, a system voice reads instead.
 
 - Model: [Qwen3-TTS 0.6B Base](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base), using the pinned [MLX community 8-bit conversion](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit/tree/50f45ef0047cde7e84c2ef04326acb8ada2436a7), Apache 2.0. About 2 GB of model files plus a pinned Python runtime and hash-locked packages, stored in the app's own Application Support folder.
-- Mochi's voice was designed once from a text description with Qwen3-TTS VoiceDesign and is cloned by timbre from the short synthetic sample [voice/companion_voice.wav](voice/companion_voice.wav). It is not a recording of any person.
+- Mochi's voice comes from Serena, one of Qwen3-TTS's built-in speakers: one synthetic sample, [voice/companion_voice.wav](voice/companion_voice.wav), is cloned by timbre only. It is not a recording of any person. (Since 0.2.1; earlier versions used a VoiceDesign sample.)
 - Speech streams as it is generated: on an M4 MacBook Air the first sound arrives in about 0.2–0.4 s, about 2× faster than real time. The installer records the 24 hourly announcements in Chinese and English once, so a chime never loads the model.
 - The voice helper runs with network access denied, loads when you start typing or recording, and unloads after 5 idle minutes or under memory pressure. If it fails before the first sound, the system voice reads that reply.
 

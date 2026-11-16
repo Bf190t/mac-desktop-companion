@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 — 2026-11
+
+### Voice
+- Mochi has a new reading voice: Serena, one of Qwen3-TTS's built-in speakers, cloned by timbre from one synthetic sample (`voice/companion_voice.wav`). It replaces the earlier VoiceDesign sample.
+- A reading voice installed by 0.2.0 keeps working with the previous voice; the chat window says so. Remove the reading voice and install it again to switch: this downloads the runtime and model again (about 2.5 GB) and records the hourly chimes with the new voice.
+
 ## 0.2.0 — 2026-11
 
 ### Chat

@@ -29,8 +29,8 @@ FORBIDDEN_SUFFIXES = {
 FORBIDDEN_ASSETS = {'Idle.png', 'Blink.png', 'Blueberry.png', 'VoiceSample.aiff',
                     'AssetManifest.json', 'python-runtime-provenance.json'}
 SOURCE_TOP = {'app', 'chat', 'voice', 'scripts', 'tests', 'docs', '.github'}
-# The one audio file that may ship: the companion's synthetic reading voice, generated from a text
-# description with Qwen3-TTS VoiceDesign (Apache-2.0). It is not a system-voice or personal recording;
+# The one audio file that may ship: the companion's synthetic reading voice, generated with a
+# built-in Qwen3-TTS speaker (Apache-2.0). It is not a system-voice or personal recording;
 # see voice/companion_voice.json. Any other audio is still rejected.
 ALLOWED_AUDIO = {'voice/companion_voice.wav', 'Contents/Resources/Voice/companion_voice.wav'}
 SOURCE_ROOT_FILES = {

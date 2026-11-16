@@ -47,8 +47,27 @@ final class ModelInstallation {
         let hash=SHA256.hash(data:lock).map{String(format:"%02x",$0)}.joined()
         return value["requirements_sha256"] as? String == hash
     }
+    /// SHA-256 of the companion sample bundled with this app; it cannot change while the app runs.
+    private lazy var bundledVoiceHash:String? = {
+        guard kind == .voice,let sample=try? Data(contentsOf:resources.appendingPathComponent("companion_voice.wav")) else{return nil}
+        return SHA256.hash(data:sample).map{String(format:"%02x",$0)}.joined()
+    }()
+    /// A reading voice installed with a different companion sample than the one in this app (0.2.1
+    /// replaced it). It keeps working; removing and installing again switches voice and chimes.
+    var hasOutdatedVoice:Bool { outdatedVoice(installed:isInstalled) }
+    private func outdatedVoice(installed:Bool) -> Bool {
+        guard kind == .voice,installed,let hash=bundledVoiceHash,
+              let data=try? Data(contentsOf:root.appendingPathComponent("installation.json")),
+              let value=try? JSONSerialization.jsonObject(with:data) as? [String:Any] else{return false}
+        return value["voice_sha256"] as? String != hash
+    }
     var status:String {
-        if !isBusy && phase != "failed" && phase != "cancelled" && isInstalled {
+        let installed=isInstalled
+        if !isBusy && phase != "failed" && phase != "cancelled" && installed {
+            if outdatedVoice(installed:installed) {
+                return L("朗读声音已安装，但还是旧版声音。小团从 0.2.1 起换了新声音：点「移除朗读声音」后重新安装即可换上（需重新下载约 2.5 GB）。",
+                         "Reading voice installed, but with the previous voice. Mochi has a new voice since 0.2.1: remove the reading voice and install it again to switch (downloads about 2.5 GB again).")
+            }
             return kind == .chat ? L("已安装。模型只在发送消息时加载。", "Installed. The model loads only when you send a message.")
                 : L("朗读声音已安装。开始打字或录音时加载，闲置 5 分钟后释放。", "Reading voice installed. It loads when you start typing or recording and unloads after 5 idle minutes.")
         }

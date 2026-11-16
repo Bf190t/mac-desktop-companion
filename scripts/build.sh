@@ -26,7 +26,7 @@ for file in worker.py model-manifest.json requirements-lock.txt MODEL-LICENSE.tx
 done
 if [[ -d "$project_dir/chat/persona" ]]; then cp -R "$project_dir/chat/persona" "$resources/Chat/"; fi
 if [[ -f "$project_dir/scripts/chat_boundary.py" ]]; then cp "$project_dir/scripts/chat_boundary.py" "$resources/Chat/"; fi
-# Optional reading voice: installer, helper and the companion's designed voice sample (no weights).
+# Optional reading voice: installer, helper and the companion's synthetic voice sample (no weights).
 mkdir -p "$resources/Voice"
 for file in tts_worker.py install.py install.sh model-manifest.json runtime-manifest.json requirements-lock.txt MODEL-LICENSE.txt THIRD-PARTY-NOTICES.txt companion_voice.wav companion_voice.json; do
   cp "$project_dir/voice/$file" "$resources/Voice/$file"
@@ -44,8 +44,8 @@ cat > "$bundle/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>Desktop Companion</string>
 <key>CFBundleExecutable</key><string>DesktopCompanion</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.2.0</string>
-<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleShortVersionString</key><string>0.2.1</string>
+<key>CFBundleVersion</key><string>3</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>

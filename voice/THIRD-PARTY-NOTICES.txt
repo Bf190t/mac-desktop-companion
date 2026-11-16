@@ -7,9 +7,9 @@ runtime as the optional chat). Pinned URL, size and SHA-256: runtime-manifest.js
 Model: mlx-community/Qwen3-TTS-12Hz-0.6B-Base-8bit (base model Qwen/Qwen3-TTS-12Hz-0.6B-Base), Apache-2.0.
 Pinned revision and per-file SHA-256: model-manifest.json. The full Apache-2.0 text is MODEL-LICENSE.txt.
 
-Companion voice: companion_voice.wav was generated once from a text description with
-mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit (Apache-2.0); see companion_voice.json. It is a
-synthetic voice, not a recording of any real person. The reading voice clones only its timbre.
+Companion voice (since 0.2.1): companion_voice.wav was generated once with the built-in speaker
+Serena of Qwen3-TTS 1.7B CustomVoice (Apache-2.0); see companion_voice.json. It is a synthetic
+voice, not a recording of any real person. The reading voice clones only its timbre.
 
 The downloaded wheels retain their *.dist-info license/metadata directories. Only prebuilt PyPI
 wheels with the pinned SHA-256 hashes in requirements-lock.txt are installed; no remote model code

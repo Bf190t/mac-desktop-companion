@@ -118,7 +118,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         @discardableResult func item(_ title:String,_ action:Selector?,_ key:String="") -> NSMenuItem {
             let v=NSMenuItem(title:title,action:action,keyEquivalent:key);v.target=self;statusMenu.addItem(v);return v
         }
-        let heading=item(L("桌面伴伴 · 0.2.0 开源版", "Desktop Companion · 0.2.0 Open source"),nil);heading.isEnabled=false
+        let heading=item(L("桌面伴伴 · 0.2.1 开源版", "Desktop Companion · 0.2.1 Open source"),nil);heading.isEnabled=false
         let characterMenu=NSMenu(title:L("选择角色", "Choose character"))
         for character in PetCharacter.allCases {
             let choice=NSMenuItem(title:character.title,action:#selector(characterMenuChanged(_:)),keyEquivalent:"")

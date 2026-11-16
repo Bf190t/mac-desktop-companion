@@ -10,7 +10,7 @@
 
 **Voice.** Recording starts and stops only when you click (60 seconds at most). On macOS 26 or newer the system's on-device recognizer is used and only microphone permission is needed; macOS may download its language model once. Earlier systems use on-device Speech recognition and need Speech permission and Dictation. Recognition follows the interface language and never falls back to a cloud service. Transcribed text can be reviewed before it is sent to chat. There is no wake-word service or continuous listening mode.
 
-**Reading voice.** Replies are read by a macOS voice unless you install the optional reading voice. Its installer contacts the upstream runtime, package and model hosts only after you start it. The voice helper then runs on your Mac with network access denied and receives only the text being read. The bundled `companion_voice.wav` is a synthetic voice generated from a text description, not a recording of a person; no system-voice sample is bundled.
+**Reading voice.** Replies are read by a macOS voice unless you install the optional reading voice. Its installer contacts the upstream runtime, package and model hosts only after you start it. The voice helper then runs on your Mac with network access denied and receives only the text being read. The bundled `companion_voice.wav` is a synthetic voice generated with Qwen3-TTS's built-in speaker Serena, not a recording of a person; no system-voice sample is bundled.
 
 **Diagnostics.** Model status and runtime errors can appear in the inspector. Paths or pieces of entered text may be visible while troubleshooting. Review anything you copy or screenshot before sharing it. The public automated fixtures are synthetic; acceptance output is excluded from the source repository.
 
@@ -26,6 +26,6 @@
 
 **语音。** 只在你点一下开始、再点一下停止之间录音（最长 60 秒）。macOS 26 及以上使用系统本机识别，只需麦克风权限，系统可能下载一次语言模型；更早的系统使用本机语音识别，需要语音识别权限并打开「听写」。识别跟随界面语言，从不回退到云端。转写后可检查文字再发送。没有唤醒词或持续监听服务。
 
-**朗读声音。** 默认用 macOS 系统声音朗读回复；另外安装可选朗读声音后用小团的声音。安装程序只在你主动安装时连接运行时、依赖包和模型的上游下载服务；朗读进程在本机运行时禁止联网，只接收要念的文字。随附的 `companion_voice.wav` 是按文字描述生成的合成声音，不是真人录音；不分发系统声音样本。
+**朗读声音。** 默认用 macOS 系统声音朗读回复；另外安装可选朗读声音后用小团的声音。安装程序只在你主动安装时连接运行时、依赖包和模型的上游下载服务；朗读进程在本机运行时禁止联网，只接收要念的文字。随附的 `companion_voice.wav` 是用 Qwen3-TTS 自带说话人 Serena 生成的合成声音，不是真人录音；不分发系统声音样本。
 
 **诊断与清理。** 调试窗口中的错误信息可能带有文件路径，分享截图和文字前请自行检查。卸载模型可使用可选组件的卸载入口；先退出应用再清理其自己的数据目录。只删除 `.app` 不一定会删除设置或模型，不要误删其他应用的数据。
