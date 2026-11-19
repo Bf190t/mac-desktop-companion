@@ -1,0 +1,88 @@
+{
+  "schema_version": "security-scan-baseline/1",
+  "python": "3.9",
+  "note": "已人工复查、确认安全的发现。reason 必须写清为什么安全；空的、null、以 TODO 开头的都不算复查过。请用被审项目自己的 Python 运行扫描，版本变了结果可能不同。",
+  "reviewed": [
+    {
+      "id": "60f99af6ba1d599d",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "app/Sources/BluetoothBattery.swift",
+      "line": 64,
+      "source": "guard let handle = dlopen(\"/System/Library/Frameworks/IOKit.framework/IOKit\", RTLD_LAZY | RTLD_LOCAL) else {",
+      "reason": "按绝对路径加载系统自带的 IOKit 框架，只取一个系统函数地址；路径写死，不受外部输入影响。"
+    },
+    {
+      "id": "b0a8cbfa65808020",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "app/Sources/ChatService.swift",
+      "line": 209,
+      "source": "let p=Process(), id=UUID(), pin=Pipe(), pout=Pipe(), perr=Pipe()",
+      "reason": "起聊天模型进程：/usr/bin/sandbox-exec + WorkerSandbox 配置（禁网、禁止启动别的程序、禁止打开 app/链接），环境变量精简，Python 用 -I -B，参数数组。"
+    },
+    {
+      "id": "1c9181caf47700c5",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "app/Sources/CompanionPrompt.swift",
+      "line": 59,
+      "source": "static func system(style: String, omitted: Bool, now: Date = Date(), notes: [String] = []) -> String {",
+      "reason": "误报：这是 Swift 自己定义的 system(style:…) 函数（拼系统提示词），不是 C 的 system()。"
+    },
+    {
+      "id": "564745036e29fdcd",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "app/Sources/CompanionPrompt.swift",
+      "line": 81,
+      "source": "return (system(style: style, omitted: earlierOmitted > 0, now: now, notes: notes),",
+      "reason": "误报：这是 Swift 自己定义的 system(style:…) 函数（拼系统提示词），不是 C 的 system()。"
+    },
+    {
+      "id": "c3c6e892174af90c",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "app/Sources/ModelInstallation.swift",
+      "line": 142,
+      "source": "let p=Process(),stdout=Pipe(),stderr=Pipe(),id=UUID()",
+      "reason": "运行 app 包里固定的 install.sh：/bin/sh + 固定脚本路径，参数数组，环境变量精简；脚本里所有下载都钉了 sha256。"
+    },
+    {
+      "id": "07971dd210d56139",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "app/Sources/NeuralSpeech.swift",
+      "line": 197,
+      "source": "let p = Process()",
+      "reason": "起朗读进程：/usr/bin/sandbox-exec + WorkerSandbox 配置（禁网、禁止启动别的程序、禁止打开 app/链接），环境变量精简，参数数组。"
+    },
+    {
+      "id": "b7f568f75d0ff369",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "scripts/tests/ChatServiceConcurrencyTests.swift",
+      "line": 107,
+      "source": "let p=Process();p.executableURL=URL(fileURLWithPath:\"/bin/sleep\");p.arguments=[\"5\"];try p.run();dummies.append(p)",
+      "reason": "单元测试里起一个 /bin/sleep 当假的模型进程，测打断回复时的热线；不随 app 发布。"
+    },
+    {
+      "id": "6e2ac95d1cf86e3a",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "tests/SingleInstanceTests.swift",
+      "line": 82,
+      "source": "let child = Process(), input = Pipe(), output = Pipe()",
+      "reason": "单元测试启动测试程序自己，验证单实例锁；不随 app 发布。"
+    },
+    {
+      "id": "cf950494c382a760",
+      "severity": "high",
+      "rule": "swift_spawn_process",
+      "file": "tests/VoiceSwitchTests.swift",
+      "line": 24,
+      "source": "let p=Process(),out=Pipe();p.executableURL=URL(fileURLWithPath:\"/usr/bin/python3\")",
+      "reason": "单元测试里问 /usr/bin/python3 它背后真实的 Python 路径（给假安装用）；不随 app 发布。"
+    }
+  ]
+}

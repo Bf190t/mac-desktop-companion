@@ -285,6 +285,7 @@ final class PetVoiceService: NSObject, AVSpeechSynthesizerDelegate {
     var readVoiceStatus: String {
         guard readVoice.isNeural else { return L("朗读声音：系统声音", "Reading voice: system voice") }
         if memoryPressure { return L("朗读声音：\(readVoice.shortName) · 内存紧张，暂时用系统声音", "Reading voice: \(readVoice.shortName) · memory is tight, using the system voice for now") }
+        if !neural.isRunning, let note = ModelInstallation.voice.voiceSwitchStatus { return L("朗读声音：", "Reading voice: ") + note }
         if !neural.isRunning && !neural.isInstalled { return L("朗读声音：", "Reading voice: ") + NeuralSpeechInstall.installHint }
         let timing = neural.lastTiming.isEmpty ? "" : L(" · 上一句", " · last reply: ") + neural.lastTiming
         return L("朗读声音：\(readVoice.shortName) · \(neural.description)", "Reading voice: \(readVoice.shortName) · \(neural.description)") + timing

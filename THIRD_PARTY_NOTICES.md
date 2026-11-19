@@ -31,6 +31,10 @@ The project does not train or modify the model weights. The companion persona an
 - [voice/companion_voice.wav](voice/companion_voice.wav) (13 s, since 0.2.1) was generated once with the built-in speaker Serena of [Qwen3-TTS 1.7B CustomVoice](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) (Apache 2.0), using the [mlx-community 6-bit conversion](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-6bit/tree/1c6c0ff58c43afa8df571facde2efa077efd85e2) at revision `1c6c0ff58c43afa8df571facde2efa077efd85e2`; its settings, seed and text are in [voice/companion_voice.json](voice/companion_voice.json). It is synthetic, not a recording of a person, and is released with this project under the MIT license as Mochi's voice reference.
 - The reading-voice packages are hash-locked in [voice/requirements-lock.txt](voice/requirements-lock.txt), including [mlx-audio](https://github.com/Blaizzy/mlx-audio) (MIT); [voice/THIRD-PARTY-NOTICES.txt](voice/THIRD-PARTY-NOTICES.txt) lists each package with its declared license.
 
+## Security scan rules
+
+`scripts/security_scan.py` is original code. Some of its rule ideas (secret prefixes with an entropy test, typical mistakes in AI-written code, risky calls in native apps) were adapted from [DeepSec](https://github.com/Unclecheng-li/DeepSec) (formerly VibeGuard, MIT licence). No DeepSec code is included or run.
+
 ## Optional Python and MLX runtime
 
 The optional installer obtains a pinned standalone CPython runtime from [Astral's python-build-standalone](https://github.com/astral-sh/python-build-standalone) and pinned prebuilt Python wheels. Runtime and package licenses must remain with those installed files; the root MIT license does not relicense them.

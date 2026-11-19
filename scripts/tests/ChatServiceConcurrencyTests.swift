@@ -95,6 +95,37 @@ struct ChatServiceConcurrencyTests {
         check("cancel wins over late normal stop", !cancel.isBusy && cancelledReply.hasPrefix(L("先停在这里", "Stopped here")))
         check("cancelled draft is ineligible", cancel.lines.last?.eligible == false)
 
+        // Review 2026-11: an interrupted reply to crisis wording still gets the support line, and the
+        // line is shown apart in the chat window but never sent back to the model.
+        let crisisDone=PetChatService();var crisisText="";crisisDone.onReply={crisisText=$0}
+        crisisDone.testingBeginRequest("活著沒意思")
+        crisisDone.testingEvent(["type":"done","id":"活著沒意思","text":"抱抱你。","finish_reason":"stop"])
+        check("support line shown apart and kept out of model context", crisisText.hasSuffix(ChatBoundary.crisisSupport) && crisisDone.lines.last?.role == "support" && crisisDone.lines.last?.inModelContext == false && crisisDone.lines.last(where:{$0.role == "assistant"})?.text == "抱抱你。" && ChatBoundary.bubbleText(crisisText).hasSuffix(ChatBoundary.crisisSupport))
+        // Round 2 (2026-11-19): a message over 5000 characters is refused, but crisis wording anywhere in it
+        // still gets the hotlines (in the status line and as a reply), and nothing is added to the history.
+        let longCrisis=PetChatService();var longReplies:[String]=[];longCrisis.onReply={longReplies.append($0)}
+        let pasted=String(repeating:"今天去超市买了牛奶和面包，路上堵车。",count:400)+"其实我有时候真的不想活了。"+String(repeating:"明天还要早起。",count:200)
+        check("long crisis message refused with hotline", !longCrisis.send(pasted) && longCrisis.lines.isEmpty && longCrisis.status.contains("5000") && longCrisis.status.hasSuffix(ChatBoundary.crisisSupport) && longReplies == [ChatBoundary.crisisOnlyReply])
+        let longPlain=PetChatService();var plainReplies:[String]=[];longPlain.onReply={plainReplies.append($0)}
+        check("long ordinary message refused without hotline", !longPlain.send(String(repeating:"今天去超市买了牛奶和面包。",count:500)) && longPlain.lines.isEmpty && !longPlain.status.contains(ChatBoundary.crisisSupport) && plainReplies.isEmpty)
+        check("crisis wording found across a piece boundary", PetChatService.longTextNeedsCrisisSupport(String(repeating:"好",count:3998)+"自杀"+String(repeating:"好",count:6000)) && !PetChatService.longTextNeedsCrisisSupport(String(repeating:"好",count:12000)) && PetChatService.longTextNeedsCrisisSupport(String(repeating:"好",count:90000)+"我不想活了") && PetChatService.longTextNeedsCrisisSupport("我不想活了"+String(repeating:"好",count:90000)))
+        var dummies:[Process]=[]
+        for (text,expectHotline,reason) in [("我不想活了",true,"memory_pressure_warning"),("I want to die",true,"memory_pressure_critical"),("今天好累",false,"memory_pressure_warning"),("自-杀",true,"lock"),("s u i c i d e",true,"chat_disabled"),("today was long",false,"lock"),("活着好没意思",true,"cancel_timeout")] {
+            let s=PetChatService();var got:[String]=[];s.onReply={got.append($0)}
+            let p=Process();p.executableURL=URL(fileURLWithPath:"/bin/sleep");p.arguments=["5"];try p.run();dummies.append(p)
+            s.testingAttachWorker(p);s.testingBeginRequest(text)
+            if reason == "lock" {s.suspended=true}
+            if reason.hasPrefix("memory") {s.testingPressure(reason.hasSuffix("critical") ? .critical:.warning)} else {s.release(reason)}
+            let hot=got.contains{$0.contains(ChatBoundary.crisisSupport)}
+            check("interrupt (\(reason)) and hotline: \(text)", hot == expectHotline && !s.isBusy && (s.lines.last?.role == "support") == expectHotline)
+            if reason == "lock" {
+                s.suspended=false
+                let expected=expectHotline ? 2:0
+                check("resume repeats the hotline bubble only after crisis: \(text)", wait({got.count == expected},timeout:0.3) && got.count == expected && s.lines.filter{$0.role == "support"}.count == (expectHotline ? 1:0))
+            }
+        }
+        for p in dummies where p.isRunning {p.terminate()}
+
         // Real anonymous pipes exercise full-buffer cancellation and EPIPE;
         // no subprocess, GUI, inference, recording, or system event is needed.
         let writer=PetChatInputWriter(),first=Pipe(),second=Pipe()

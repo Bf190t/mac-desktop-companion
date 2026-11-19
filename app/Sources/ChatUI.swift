@@ -236,6 +236,7 @@ final class ChatInspector: NSObject,NSWindowDelegate,NSTextViewDelegate {
         longMode.state=service.longResidency ? .on:.off
         send.isEnabled=(maySend?() ?? service.canSend);stop.isEnabled=service.isBusy;unload.isEnabled=service.hasWorker && !service.stopping;clear.isEnabled=service.canSend
         let lines=service.lines.map{line->String in
+            if line.role == "support" {return L("热线提示（只显示，不发给模型）", "Support line (shown only; not sent to the model)")+"\n"+line.text}
             let who=line.role == "user" ? L("你", "You"):L("角色", "Mochi")
             let note = !line.eligible ? L("（未完成，不用于后续对话）", "(Incomplete; excluded from future context)") : line.inModelContext ? "" : line.role == "user" ? L("（不再带入后续对话）", "(No longer sent to the model)"):L("（应用固定回复，不发给模型）", "(App reply; not sent to the model)")
             return who+note+"\n"+line.text

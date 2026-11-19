@@ -21,11 +21,11 @@ private final class PublicAcceptance {
         guard let bitmap=view.bitmapImageRepForCachingDisplay(in:view.bounds) else{record("capture_"+name,false);return}
         view.cacheDisplay(in:view.bounds,to:bitmap)
         guard let data=bitmap.representation(using:.png,properties:[:]),data.count>200 else{record("capture_"+name,false);return}
-        do{try data.write(to:output.appendingPathComponent(name+".png"));pictures.append(name+".png");record("capture_"+name,true)}catch{record("capture_"+name,false)}
+        do{try data.write(to:output.appendingPathComponent(name+".png"),options:.atomic);pictures.append(name+".png");record("capture_"+name,true)}catch{record("capture_"+name,false)}
     }
     func cpu()->Double {var r=rusage();getrusage(RUSAGE_SELF,&r);return Double(r.ru_utime.tv_sec+r.ru_stime.tv_sec)+Double(r.ru_utime.tv_usec+r.ru_stime.tv_usec)/1e6}
     func run(){
-        try? FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+        guard prepareOwnerOnlyDirectory(output) else {fputs("UI acceptance: output folder is missing, not a folder, or not owned by you\n",stderr);exit(1)}
         record("isolated_preferences",app.prefs.defaults !== UserDefaults.standard)
         guard checks["isolated_preferences"] == true else{finish();return}
         later(45){self.record("watchdog",false);self.finish()}
@@ -137,8 +137,19 @@ private final class PublicAcceptance {
     func finish(){
         guard !finished else{return};finished=true
         let report:[String:Any]=["passed":checks.values.allSatisfy{$0},"checks":checks,"screenshots":pictures,"performance":performance,"physicalSleepLockTested":false,"realMicrophoneTested":false,"batteryEnergyMeasured":false,"notes":"App-local controls and lifecycle simulation; no OS sleep, lock, or physical battery test."]
-        if let data=try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]) {try? data.write(to:output.appendingPathComponent("report.json"))}
+        if let data=try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]) {try? data.write(to:output.appendingPathComponent("report.json"),options:.atomic)}
         print("Public native acceptance: \(checks.filter{$0.value}.count)/\(checks.count)")
         DispatchQueue.main.asyncAfter(deadline:.now()+0.2){self.app.quit()}
     }
+}
+
+/// Output folder for acceptance and preview runs (security review 2026-11-19): created owner-only; an
+/// existing folder must be a real directory owned by this user and is narrowed to 0700; files are written
+/// with umask 077. These runs are separate processes, so the umask does not affect the companion itself.
+func prepareOwnerOnlyDirectory(_ url: URL) -> Bool {
+    umask(0o077)
+    try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    var info = stat()
+    guard lstat(url.path, &info) == 0, (info.st_mode & S_IFMT) == S_IFDIR, info.st_uid == getuid() else { return false }
+    return chmod(url.path, 0o700) == 0
 }

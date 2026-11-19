@@ -37,8 +37,17 @@ final class SingleInstanceGuard {
         if let pid = existingPID(bundleID: bundleID, ownPID: getpid(), apps: apps) {
             return .alreadyRunning(pid: pid)
         }
-        let directory = URL(fileURLWithPath: "/private/tmp/desktop-companion-locks-\(getuid())", isDirectory: true)
-        return acquireLock(bundleID: bundleID, directory: directory)
+        return acquireLock(bundleID: bundleID, directory: userLockDirectory())
+    }
+
+    /// The lock lives in this user's own temporary folder (/var/folders/…/T/, owner-only), not in the
+    /// shared /tmp: there another account could create the directory first and keep the app from
+    /// starting (security review 2026-11-19). confstr ignores a TMPDIR set by whoever launched us.
+    static func userLockDirectory() -> URL {
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        let length = confstr(_CS_DARWIN_USER_TEMP_DIR, &buffer, buffer.count)
+        let base = length > 0 && length <= buffer.count ? String(cString: buffer) : NSTemporaryDirectory()
+        return URL(fileURLWithPath: base, isDirectory: true).appendingPathComponent("desktop-companion-locks", isDirectory: true)
     }
 
     // Internal entry point permits subprocess-only QA in a fresh fixture

@@ -2,13 +2,13 @@
 set -euo pipefail
 project_dir="$(cd "$(dirname "$0")/.." && pwd)"
 app_dir="${1:-$project_dir/dist/Desktop Companion.app}"
-output="${2:-$project_dir/dist/Desktop-Companion-0.2.1-AppleSilicon.zip}"
+output="${2:-$project_dir/dist/Desktop-Companion-0.2.2-AppleSilicon.zip}"
 if [[ -e "$output" ]]; then echo 'Archive already exists; choose a new output.' >&2; exit 1; fi
 /usr/bin/codesign --verify --deep --strict "$app_dir"
 "$app_dir/Contents/MacOS/DesktopCompanion" --self-test
 stage="$(mktemp -d "$project_dir/build/package.XXXXXX")"
 trap 'rm -rf "$stage"' EXIT
-folder="$stage/Desktop Companion 0.2.1"
+folder="$stage/Desktop Companion 0.2.2"
 mkdir -p "$folder"
 /usr/bin/ditto --noextattr --noqtn "$app_dir" "$folder/Desktop Companion.app"
 cp "$project_dir/README.md" "$folder/README.md"

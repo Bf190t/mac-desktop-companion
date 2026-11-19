@@ -133,15 +133,16 @@ extension AppDelegate {
     }
     func showChatBubble(_ text:String) {
         guard interactionDecision.canShowChatBubble else{return}
-        // Room for a reply plus the crisis-support line (B6).
-        let reply=String(text.prefix(200))
+        // Only the reply is capped; the crisis-support line after it is always shown in full, and the
+        // bubble grows (and stays longer) to fit it.
+        let support=ChatBoundary.bubbleParts(text).support != nil,reply=ChatBoundary.bubbleText(text)
         bubbleTimer?.invalidate();bubbleView.label.stringValue=reply
-        let width:CGFloat=min(320,max(260,prefs.height*0.7))
-        let measured=(reply as NSString).boundingRect(with:NSSize(width:width-34,height:300),options:[.usesLineFragmentOrigin,.usesFontLeading],attributes:[.font:NSFont.systemFont(ofSize:14,weight:.medium)])
-        let height=min(240,max(94,ceil(measured.height)+48))
+        let width:CGFloat=min(320,max(260,prefs.height*0.7)),shown:TimeInterval=support ? 60:30
+        let measured=(reply as NSString).boundingRect(with:NSSize(width:width-34,height:2000),options:[.usesLineFragmentOrigin,.usesFontLeading],attributes:[.font:NSFont.systemFont(ofSize:14,weight:.medium)])
+        let height=min(support ? 560:240,max(94,ceil(measured.height)+48))
         bubble.setContentSize(NSSize(width:width,height:height));bubbleView.frame=NSRect(x:0,y:0,width:width,height:height);bubbleView.layoutText()
-        positionBubble();bubble.orderFrontRegardless();chatBubbleUntil=ProcessInfo.processInfo.systemUptime+30
-        bubbleTimer=Timer.scheduledTimer(withTimeInterval:30,repeats:false){[weak self] _ in self?.hideBubble();self?.chatBubbleUntil=0}
+        positionBubble();bubble.orderFrontRegardless();chatBubbleUntil=ProcessInfo.processInfo.systemUptime+shown
+        bubbleTimer=Timer.scheduledTimer(withTimeInterval:shown,repeats:false){[weak self] _ in self?.hideBubble();self?.chatBubbleUntil=0}
         bubbleTimer?.tolerance=0.5
     }
     func setupVoice(){

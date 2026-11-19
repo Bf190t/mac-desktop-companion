@@ -1,6 +1,6 @@
 """Local JSON-lines worker. No listener, network inference, tools, or audio APIs."""
 from pathlib import Path
-import argparse, contextlib, ctypes, hashlib, json, os, queue, sys, threading, time
+import argparse, contextlib, ctypes, hashlib, json, os, queue, re, sys, threading, time
 
 SOURCE=Path(__file__).resolve().parent
 ROOT=Path(os.environ.get('COMPANION_CHAT_ROOT',str(SOURCE))).resolve()
@@ -87,6 +87,36 @@ def emit(kind,**values):
     with lock:
         print(json.dumps({'type':kind,**values},ensure_ascii=False,allow_nan=False),file=protocol_out,flush=True)
 
+# Chat-template control tokens in any text from the app (user and assistant turns, persona, profile,
+# examples) become full-width look-alikes, so they can never open a forged system or assistant turn.
+# Besides the loaded tokenizer's own table, a general rule (kept equal to ChatBoundary.swift): "<" directly
+# followed by |, ｜, / or a letter (zero-width characters ignored), up to 64 characters and ">" (<|im_start|>,
+# <think>, <turn|>, <|turn>, <tool_call>, </s>), and "[" + capital letters + "]" ([INST], [SYSTEM_PROMPT]).
+TEMPLATE_TOKEN=re.compile(r'<[\u200b-\u200d\u2060\ufeff]*[|\uff5c/A-Za-z][^<>\n]{0,64}?>|\[/?[A-Z][A-Z0-9_]{1,40}\]|\[/?[Ii][Nn][Ss][Tt]\]')
+SOFT_SWITCH=re.compile(r'/((?:no_)?think)\b',re.I)
+
+def special_token_strings(tok=None):
+    """Every added/special token string the loaded tokenizer would match inside plain text."""
+    tok=tok if tok is not None else tokenizer
+    if tok is None:return ()
+    found=set(getattr(tok,'added_tokens_encoder',None) or {})
+    found.update(getattr(tok,'all_special_tokens',None) or [])
+    return tuple(sorted((t for t in found if isinstance(t,str) and t.strip()),key=len,reverse=True))
+
+def _harmless(token):
+    out=token.replace('<','\uff1c').replace('>','\uff1e').replace('[','\uff3b').replace(']','\uff3d')
+    return out if out!=token else token[:1]+'\u2060'+token[1:]
+
+def neutralize_template_tokens(text,specials=None):
+    specials=special_token_strings() if specials is None else specials
+    for _ in range(8):
+        before=text
+        for token in specials:
+            if token in text:text=text.replace(token,_harmless(token))
+        text=TEMPLATE_TOKEN.sub(lambda m:_harmless(m.group(0)),text)
+        if text==before:break
+    return SOFT_SWITCH.sub(lambda m:'\uff0f'+m.group(1),text)
+
 def validate_messages(value):
     if not isinstance(value,list) or not value or len(value)>80:
         raise ValueError('聊天记录格式不正确。')
@@ -97,7 +127,7 @@ def validate_messages(value):
         content=item.get('content')
         if not isinstance(content,str) or not content.strip() or len(content)>5000:
             raise ValueError('请把单条消息控制在5000字以内。')
-        cleaned.append({'role':item['role'],'content':content.strip()})
+        cleaned.append({'role':item['role'],'content':neutralize_template_tokens(content.strip())})
     if cleaned[-1]['role']!='user':raise ValueError('最后一条消息需要是你的提问。')
     trimmed=cleaned[:]
     while len(trimmed)>1 and trimmed[0]['role']!='user':trimmed.pop(0)
@@ -129,7 +159,7 @@ def validate_prompt_parts(system,examples):
     for pair in examples:
         if not isinstance(pair,list) or len(pair)!=2 or not all(isinstance(t,str) and t.strip() and len(t)<=400 for t in pair):
             raise ValueError('示范对话格式不正确。')
-        pairs+= [{'role':'user','content':pair[0].strip()},{'role':'assistant','content':pair[1].strip()}]
+        pairs+= [{'role':'user','content':neutralize_template_tokens(pair[0].strip())},{'role':'assistant','content':neutralize_template_tokens(pair[1].strip())}]
     return pairs
 
 def validate_chat_request(req):
@@ -252,7 +282,7 @@ def prepare_prompt(messages,mode,history_omitted_messages=0,persona_override=Non
             if initial_count>len(history) or history_omitted_messages:
                 prompt+='\n'+OMITTED_NOTE_ZH
         # Example turns sit between the system prompt and the history, so trimming never drops them.
-        combined=[{'role':'system','content':prompt},*shots,*history]
+        combined=[{'role':'system','content':neutralize_template_tokens(prompt)},*shots,*history]
         tokens=tokenizer.apply_chat_template(combined,tokenize=True,return_dict=False,add_generation_prompt=True,enable_thinking=False)
         if len(tokens)<=MAX_PROMPT:return tokens,initial_count-len(history)
         if len(history)<=1:raise ValueError('这段文字超过当前短对话长度，请缩短后再发。')

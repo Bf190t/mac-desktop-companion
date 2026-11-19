@@ -25,7 +25,7 @@ trap 'exit 130' HUP INT TERM
 url='https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.12.15%2B20261021-aarch64-apple-darwin-install_only.tar.gz'
 sha='a18cc33862b53bd54a148c710def5375c1b47470cccedf817a19c2d211764584'
 printf '%s\n' '{"progress":0.02,"phase":"runtime"}'
-/usr/bin/curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error --connect-timeout 30 --max-time 900 --retry 2 "$url" -o "$stage/python.tar.gz" & child=$!
+/usr/bin/curl -q --max-filesize 25158763 --fail --location --proto '=https' --proto-redir '=https' --silent --show-error --connect-timeout 30 --max-time 900 --retry 2 "$url" -o "$stage/python.tar.gz" & child=$!
 wait "$child"; child=''
 actual=$(/usr/bin/shasum -a 256 "$stage/python.tar.gz" | /usr/bin/cut -d' ' -f1)
 if [ "$actual" != "$sha" ]; then echo 'Python archive checksum mismatch' >&2; exit 3; fi

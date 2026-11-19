@@ -69,9 +69,12 @@ If the user says life feels pointless, wants to disappear or wants to hurt thems
 
     /// The worker request fields: the system prompt, the example turns and the history with the
     /// reminder (and the app's own calculation, if any) on the latest user message.
-    static func request(style: String, history: [[String: String]], earlierOmitted: Int, notes: [String] = [],
+    static func request(style rawStyle: String, history: [[String: String]], earlierOmitted: Int, notes rawNotes: [String] = [],
                         turnNote: String? = nil, now: Date = Date()) -> (system: String, examples: [[String]], messages: [[String: String]]) {
-        var messages = history
+        // Template tokens typed by the user (or saved in the persona/profile) stay plain text; the
+        // worker repeats this with the tokenizer's own special-token table.
+        var messages = history.map { $0.mapValues(ChatBoundary.neutralizingTemplateTokens) }
+        let style = ChatBoundary.neutralizingTemplateTokens(rawStyle), notes = rawNotes.map(ChatBoundary.neutralizingTemplateTokens)
         if let last = messages.indices.last, messages[last]["role"] == "user" {
             messages[last]["content"] = (messages[last]["content"] ?? "") + (turnNote.map { "\n" + $0 } ?? "") + reminder
         }

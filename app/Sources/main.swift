@@ -31,6 +31,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
     var dragging=false
     var idleTimer:Timer?,blinkReturn:Timer?,bubbleTimer:Timer?,hourTimer:Timer?
     var suspensions=Set<String>()
+    private var lockCheckPending=false
     var monitorSuspended=false
     var metricsRequested=false
     var speech:AVSpeechSynthesizer?
@@ -118,7 +119,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         @discardableResult func item(_ title:String,_ action:Selector?,_ key:String="") -> NSMenuItem {
             let v=NSMenuItem(title:title,action:action,keyEquivalent:key);v.target=self;statusMenu.addItem(v);return v
         }
-        let heading=item(L("桌面伴伴 · 0.2.1 开源版", "Desktop Companion · 0.2.1 Open source"),nil);heading.isEnabled=false
+        let heading=item(L("桌面伴伴 · 0.2.2 开源版", "Desktop Companion · 0.2.2 Open source"),nil);heading.isEnabled=false
         let characterMenu=NSMenu(title:L("选择角色", "Choose character"))
         for character in PetCharacter.allCases {
             let choice=NSMenuItem(title:character.title,action:#selector(characterMenuChanged(_:)),keyEquivalent:"")
@@ -349,6 +350,24 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
             DispatchQueue.main.asyncAfter(deadline:.now()+0.7){[weak self] in self?.checkInitialSession();self?.refreshRuntime()}
         }
     }
+    /// Any program can post "com.apple.screenIsLocked" (security review 2026-11-19), so it is only a hint:
+    /// nothing stops until the session itself reports the lock (checked now and after 0.5, 1.5 and 4 s).
+    /// Repeated hints wait for one check, so a flood of fake hints cannot keep interrupting voice input.
+    func lockBroadcast(){
+        if sessionReportsLock() {lockCheckPending=false;setSuspension("lock",true);return}
+        guard !lockCheckPending else{return}
+        lockCheckPending=true
+        for (index,delay) in [0.5,1.5,4.0].enumerated() {
+            DispatchQueue.main.asyncAfter(deadline:.now()+delay){[weak self] in
+                guard let self=self,self.lockCheckPending else{return}
+                if self.sessionReportsLock() {self.lockCheckPending=false;self.setSuspension("lock",true)}
+                else if index == 2 {self.lockCheckPending=false}
+            }
+        }
+    }
+    func sessionReportsLock()->Bool{
+        ((CGSessionCopyCurrentDictionary() as? [String:Any])?["CGSSessionScreenIsLocked"] as? Bool) ?? false
+    }
     func checkInitialSession(){
         if let s=CGSessionCopyCurrentDictionary() as? [String:Any] {
             // This compatibility key is not a public lock-state contract. Workspace
@@ -365,7 +384,7 @@ final class AppDelegate: NSObject,NSApplicationDelegate,NSMenuDelegate,NSWindowD
         for (name,cause,state) in events {workspaceObservers.append(wc.addObserver(forName:name,object:nil,queue:.main){[weak self] _ in self?.setSuspension(cause,state)})}
         let dc=DistributedNotificationCenter.default()
         for (name,state) in [("com.apple.screenIsLocked",true),("com.apple.screenIsUnlocked",false)] {
-            distributedObservers.append(dc.addObserver(forName:Notification.Name(name),object:nil,queue:.main){[weak self] _ in self?.setSuspension("lock",state)})
+            distributedObservers.append(dc.addObserver(forName:Notification.Name(name),object:nil,queue:.main){[weak self] _ in if state {self?.lockBroadcast()} else {self?.setSuspension("lock",false)}})
         }
         _=ProcessInfo.processInfo.thermalState
         for name in [ProcessInfo.thermalStateDidChangeNotification,Notification.Name.NSProcessInfoPowerStateDidChange] {

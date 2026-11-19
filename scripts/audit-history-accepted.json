@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "about": "Known hits in already-published git history. The history was rewritten on 2026-11-19 to remove the retired voice sample and private terms, so nothing is waived now. audit_release.py --mode history waives a hit only when its blob id and rule (and, for path rules, the path) are listed here; any other hit fails. Entries never contain the matched text.",
+  "accepted": []
+}

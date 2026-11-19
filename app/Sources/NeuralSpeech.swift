@@ -32,6 +32,9 @@ struct NeuralSpeechInstall {
     /// Hourly chime in the companion's voice, recorded once per language by the installer
     /// ("现在是9点。" / "It's nine o'clock."); nil when the clip is missing (the system voice is used then).
     static func chimeClip(hour: Int?) -> URL? {
+        // Clips recorded with a previous voice sample are not played (the system voice says the hour).
+        let installation = ModelInstallation.voice
+        guard !installation.isBusy, !installation.hasOutdatedVoice else { return nil }
         let name = hour.map { String(format: "chime-%02d.wav", $0) } ?? "chime-test.wav"
         let url = root.appendingPathComponent("voices/chimes/\(Language.current == .english ? "en" : "zh")/\(name)")
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
@@ -54,6 +57,9 @@ struct NeuralSpeechInstall {
         guard !installation.isBusy, installation.isInstalled,
               let worker = resources?.appendingPathComponent("Voice/tts_worker.py"),
               FileManager.default.fileExists(atPath: worker.path) else { return nil }
+        // Never clone the previous sample: switch it in place first (no download), and read with
+        // the system voice until that is done.
+        if installation.hasOutdatedVoice { installation.switchVoiceIfNeeded(); return nil }
         let root = installation.root
         return NeuralSpeechInstall(python: installation.python, model: root.appendingPathComponent("model", isDirectory: true),
                                    worker: worker, deps: root.appendingPathComponent("deps", isDirectory: true),
@@ -189,9 +195,10 @@ final class NeuralSpeechEngine {
         guard let install = NeuralSpeechInstall.load() else { setState(.notInstalled); return }
         signal(SIGPIPE, SIG_IGN)   // a write to a helper that just exited must not end the pet
         let p = Process()
-        // Like the chat worker: the helper runs with network access denied.
+        // Like the chat worker: same sandbox (no network, no other programs) and a minimal environment.
         p.executableURL = URL(fileURLWithPath: "/usr/bin/sandbox-exec")
-        p.arguments = ["-p", "(version 1)(allow default)(deny network*)", install.python.path, "-I", "-B", "-u", install.worker.path,
+        p.environment = WorkerSandbox.environment()
+        p.arguments = WorkerSandbox.arguments(python: install.python) + ["-I", "-B", "-u", install.worker.path,
                        "--deps", install.deps.path, "--model-path", install.model.path, "--voice-ref", install.voice.path,
                        "--parent-pid", "\(getpid())"]
         let stdin = Pipe(), stdout = Pipe()

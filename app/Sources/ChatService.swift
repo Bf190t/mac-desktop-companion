@@ -85,7 +85,15 @@ final class PetChatInputWriter {
 // One model process and one in-memory conversation shared by the pet and inspector.
 final class PetChatService {
     var onChange: (() -> Void)?
-    var onReply: ((String) -> Void)?
+    /// Every reply passes through here. When it carries the crisis-support line, that line is also kept
+    /// as its own "support" line in the chat window (shown only, never sent to the model).
+    var onReply: ((String) -> Void)? {
+        get { { [weak self] text in self?.noteCrisisSupport(in:text);self?.replyHandler?(text) } }
+        set { replyHandler=newValue }
+    }
+    private var replyHandler: ((String) -> Void)?
+    /// A crisis-support reply interrupted by lock, sleep or a hidden companion is shown again on resume.
+    private var pendingCrisisNotice: String?
     private(set) var lines: [PetChatLine] = []
     private(set) var status = L("模型未加载，发送消息时启动。", "Model not loaded. It starts when you send a message.")
     private(set) var lastRelease = L("尚未发生卸载", "No unload yet")
@@ -102,7 +110,7 @@ final class PetChatService {
     var canSend: Bool { currentID == nil && !stopping && !suspended && !memoryPressureBlocked && (worker == nil || worker?.isRunning == true) }
     var hasWorker: Bool { worker != nil }
     var isBusy: Bool { currentID != nil }
-    var suspended = false
+    var suspended = false { didSet { if oldValue && !suspended { showPendingCrisisNotice() } } }
     var inspecting = false { didSet { updateStatsTimer() } }
     var longResidency = false {
         didSet {
@@ -155,11 +163,34 @@ final class PetChatService {
         }
     }
     func changed() { onChange?() }
+    /// Crisis check for a message too long to send: checked in overlapping 4000-character pieces, so wording
+    /// anywhere in a long paste is found. A huge paste is checked in its first 40 000 and last 20 000
+    /// characters (about 0.2 s), so the window never stalls.
+    static func longTextNeedsCrisisSupport(_ text: String) -> Bool {
+        let all = Array(text.unicodeScalars)
+        let parts = all.count <= 60_000 ? [all[...]] : [all[..<40_000], all[(all.count - 20_000)...]]
+        for scalars in parts {
+            var start = scalars.startIndex
+            while start < scalars.endIndex {
+                let end = min(start + 4000, scalars.endIndex)
+                if ChatBoundary.needsCrisisSupport(String(String.UnicodeScalarView(scalars[start..<end]))) { return true }
+                if end == scalars.endIndex { break }
+                start = end - 100
+            }
+        }
+        return false
+    }
     func send(_ raw: String) -> Bool {
         guard canSend else {return false}
         let text=raw.trimmingCharacters(in:.whitespacesAndNewlines)
         guard !text.isEmpty, text.unicodeScalars.count <= 5000 else {
-            status=L("请发送 1–5000 字的消息。", "Please send a message of 1–5000 characters."); changed(); return false
+            status=L("请发送 1–5000 字的消息。", "Please send a message of 1–5000 characters.")
+            // A long paste is not sent, but crisis wording inside it still gets the hotlines.
+            if Self.longTextNeedsCrisisSupport(text) {
+                status+="\n"+ChatBoundary.crisisSupport
+                onReply?(ChatBoundary.crisisOnlyReply)
+            }
+            changed(); return false
         }
         append(PetChatLine(role:"user",text:text))
         let learned=profile.learn(from:text)
@@ -195,16 +226,16 @@ final class PetChatService {
     private func append(_ line:PetChatLine) {
         lines.append(line)
         while lines.count>80 {lines.removeFirst();omitted += 1}
-        while lines.first?.role == "assistant" {lines.removeFirst();omitted += 1}
+        while let first=lines.first,first.role != "user" {lines.removeFirst();omitted += 1}
     }
     private func startWorker() {
         let p=Process(), id=UUID(), pin=Pipe(), pout=Pipe(), perr=Pipe()
         p.executableURL=URL(fileURLWithPath:"/usr/bin/sandbox-exec")
         // Isolated Python ignores environment injection; a tiny owned launcher
         // adds only our bundled dependency directory. No server or network.
-        p.arguments=["-p","(version 1)(allow default)(deny network*)",root.appendingPathComponent("python-base/bin/python3.12").path,"-I","-B","-u",source.appendingPathComponent("launch.py").path,root.path,"--idle-seconds",String(idleSeconds)]
+        p.arguments=WorkerSandbox.arguments(python:root.appendingPathComponent("python-base/bin/python3.12"))+["-I","-B","-u",source.appendingPathComponent("launch.py").path,root.path,"--idle-seconds",String(idleSeconds)]
         p.currentDirectoryURL=root
-        p.environment=["PATH":"/usr/bin:/bin","HOME":NSHomeDirectory(),"TMPDIR":NSTemporaryDirectory(),"HF_HUB_OFFLINE":"1","TRANSFORMERS_OFFLINE":"1","HF_HUB_DISABLE_TELEMETRY":"1","PYTHONDONTWRITEBYTECODE":"1","PYTHONUNBUFFERED":"1"]
+        p.environment=WorkerSandbox.environment()
         p.standardInput=pin;p.standardOutput=pout;p.standardError=perr
         worker=p;token=id;stdout=pout.fileHandleForReading;stderr=perr.fileHandleForReading
         intentionalExit=nil;diagnostics="";stopping=false
@@ -328,6 +359,16 @@ final class PetChatService {
     static func withCrisisSupport(_ reply:String,for userText:String) -> String {
         ChatBoundary.needsCrisisSupport(userText) ? reply+"\n"+ChatBoundary.crisisSupport : reply
     }
+    private func noteCrisisSupport(in text:String) {
+        guard let line=ChatBoundary.bubbleParts(text).support,!(lines.last?.role == "support" && lines.last?.text == line) else{return}
+        append(PetChatLine(role:"support",text:line,inModelContext:false))
+    }
+    private func showPendingCrisisNotice() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self=self,!self.suspended,let notice=self.pendingCrisisNotice else{return}
+            self.pendingCrisisNotice=nil;self.replyHandler?(notice)
+        }
+    }
     private func excludeLastUserFromModelContext() {
         if let index=lines.indices.last,lines[index].role == "user" {lines[index].inModelContext=false}
     }
@@ -374,9 +415,14 @@ final class PetChatService {
         intentionalExit=reason;lastRelease=Self.reasonLabel(reason);stopping=true
         let hadPending=currentID != nil
         if hadPending {finishIncomplete();currentID=nil}
+        // Whatever stopped the reply, someone who just wrote about crisis still gets the support line.
+        let crisis=hadPending && ChatBoundary.needsCrisisSupport(lastUserText)
         if hadPending && ["memory_pressure_warning","memory_pressure_critical","memory_limit","pipe_closed"].contains(reason) {
-            onReply?(L("这次回复暂停了，模型正在释放。可以在本地模型状态里查看原因。", "Reply paused while the model unloads. Check Local Model status for the reason."))
-        }
+            onReply?(Self.withCrisisSupport(L("这次回复暂停了，模型正在释放。可以在本地模型状态里查看原因。", "Reply paused while the model unloads. Check Local Model status for the reason."),for:lastUserText))
+        } else if crisis {onReply?(ChatBoundary.crisisOnlyReply)}
+        // While locked, asleep or hidden no bubble can show: the line is in the chat window and the
+        // bubble repeats it on resume.
+        if crisis && suspended {pendingCrisisNotice=ChatBoundary.crisisOnlyReply}
         statsTimer?.invalidate();statsTimer=nil
         status=L("正在释放模型：\(lastRelease)", "Unloading model: \(lastRelease)");write(["action":"quit","reason":reason]);changed()
         let id=token
@@ -413,6 +459,8 @@ final class PetChatService {
         append(PetChatLine(role:"user",text:id))
     }
     func testingEvent(_ event:[String:Any]) {handle(event)}
+    /// Stands in for a running model process so release() takes its pending-reply path.
+    func testingAttachWorker(_ process:Process) {worker=process;token=UUID()}
     #endif
 }
 

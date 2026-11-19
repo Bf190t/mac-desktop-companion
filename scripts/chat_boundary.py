@@ -134,6 +134,60 @@ def _output_violation(text):
     return None
 
 
+# Characters the rules must see in Simplified form (kept equal to ChatBoundary.swift). Generated with ICU
+# Hant-Hans for every character that appears in a rule, so the Swift side needs no ICU and both agree.
+_TRADITIONAL = str.maketrans(
+    '丟並乾併來係俬個備傷價儘兒別刪則劑勁動務厭員唸問喫嗎噹報壺夠學實寫將尋對幫幹幾廻弔張彆彈後從復徹悳態憶應戲戶拋撐擔攢斷昇時會條樓橋機檯權歡殘殺毀氣決沒準滅潑瀏為無熱燒燬爐爲獄現當發盃盡眞瞭碼禮稱竈箇級終結絕絡給統絶經綫網緊線總繞繫纍義聯脈脫腦膩臺萬著葯薦藥處號衚裏裡製複規視覽訂記設許訴証評詞話語說説課請講證議變讓責買貼賣賬賽跤躍車軟輕輸農迴這週過遠還邊銀錄錯録鍋鎖鎮鑰開閱閲闆陞陣陰陽隻離難電靜韓頁頂項須頭顆題顯颱騙驗髮鬍鬚鬱鯊麵麼麽黨齣',
+    '丢并干并来系私个备伤价尽儿别删则剂劲动务厌员念问吃吗当报壶够学实写将寻对帮干几回吊张别弹后从复彻德态忆应戏户抛撑担攒断升时会条楼桥机台权欢残杀毁气决没准灭泼浏为无热烧毁炉为狱现当发杯尽真了码礼称灶个级终结绝络给统绝经线网紧线总绕系累义联脉脱脑腻台万着药荐药处号胡里里制复规视览订记设许诉证评词话语说说课请讲证议变让责买贴卖账赛交跃车软轻输农回这周过远还边银录错录锅锁镇钥开阅阅板升阵阴阳只离难电静韩页顶项须头颗题显台骗验发胡须郁鲨面么么党出')
+# Cyrillic and Greek letters that look like Latin ones ("kіll", "раssword").
+_HOMOGLYPHS = str.maketrans('асеорхуіјѕԁӏһкмтпԛԝɡıαοεικνρτυχως', 'aceopxyijsdlhkmtnqwgiaoeikvptuxws')
+_IGNORED = set('\u115f\u1160\u3164\uffa0\u2800')
+_KEEP_MARKS = set('\u3099\u309a')
+_HAN = '[㐀-䶿一-鿿]'
+# Joining removes these between Chinese characters; it never crosses sentence punctuation.
+_SEP = '[^㐀-䶿一-鿿a-z0-9，,。！!？?；;、…]'
+
+
+def normalized_forms(text):
+    """Mirror of ChatBoundary.normalizedForms. (1) NFKD, lower case, without combining marks (Zalgo, "suïcide"),
+    format characters (zero-width, soft hyphen) and Hangul fillers, then NFKC (full-width, maths letters);
+    look-alike Cyrillic/Greek letters and Traditional characters mapped; a space between Chinese and Latin
+    ("我想kill myself"). (2) The same with separators between Chinese characters (spaces, symbols, emoji, one
+    inserted letter or digit), punctuation inside Latin words and spaces between single letters removed."""
+    t = unicodedata.normalize('NFKD', text).lower()
+    t = ''.join(c for c in t if c in _KEEP_MARKS or (unicodedata.category(c) not in ('Mn', 'Me', 'Cf') and c not in _IGNORED))
+    t = unicodedata.normalize('NFKC', t).lower().translate(_HOMOGLYPHS).translate(_TRADITIONAL).replace('甚么', '什么')
+    folded = re.sub(r'\s+', ' ', t).strip(' ')
+    folded = re.sub('(?<=' + _HAN + ')(?=[a-z])|(?<=[a-z])(?=' + _HAN + ')', ' ', folded)
+    joined = re.sub('(?<=' + _HAN + ')' + _SEP + '*(?:[a-z0-9]' + _SEP + '*)?(?=' + _HAN + ')', '', folded)
+    joined = re.sub('(?<=[a-z])[^a-z0-9\\s㐀-䶿一-鿿，,。！!？?；;、…]+(?=[a-z])', '', joined)
+    joined = re.sub(r'(?<=\b[a-z])\s(?=[a-z]\b)', '', joined)
+    return [folded] if joined == folded else [folded, joined]
+
+
+def crisis_forms(text):
+    return normalized_forms(text)
+
+
+def needs_crisis_support(text):
+    forms = normalized_forms(text)
+    return any(_has(CRISIS, t) or _has(CRISIS_EN, t) for t in forms) or _has(CRISIS_COMPACT, re.sub(r'\s+', '', forms[-1]))
+
+
+def _asks_for_secret(text):
+    """Only a reply that asks the user to hand over a password or code here. Advice about passwords,
+    cryptography homework and "never share it" warnings are left alone."""
+    for form in normalized_forms(text):
+        form = re.sub(r'密码学|cryptograph[a-z]*', '学科', form)
+        form = re.sub(r'pass[\s_]*word', 'password', form)
+        for clause in re.split(r'[。！!？?；;，,]|\.(?=\s|$)', form):
+            if _has(NEGATED, re.sub(REASSURE, '', clause)) or _has(ELSEWHERE, clause):
+                continue
+            if _has(ASK_ZH, clause) or _has(ASK_EN, clause):
+                return True
+    return False
+
+
 def sanitize_reply(text):
     """Validate complete generated text, then preserve at most two short sentences.
 
@@ -141,6 +195,10 @@ def sanitize_reply(text):
     counts code points conservatively; the Swift UI uses grapheme characters.
     No overlong sentence is cut into a falsely complete fragment.
     """
+    text = re.sub('[\u202a-\u202e\u2066-\u2069\u200e\u200f\u061c]', '', text)
+    text = re.sub(r'<\|[^<>\n]{1,64}?\|>|</?think>', ' ', text)
+    if _asks_for_secret(text):
+        return PASSWORD_REPLY
     replacement = _output_violation(text)
     if replacement is not None:
         return replacement
@@ -197,3 +255,12 @@ PROMPT_REPLY = '我的默认风格是温和、简短回答。可以在「本地�
 TEXT_INPUT_REPLY = '收到你的文字了。聊天模型只读取文字，语音由应用先转写。'
 WEATHER_REPLY = '我没有实时天气数据，不能判断现在的天气。请查看天气应用。'
 CLOCK_REPLY = '聊天没有接入实时时钟。请看 Mac 菜单栏显示的时间。'
+PASSWORD_REPLY = '我不会向你要密码。任何让你输入密码的聊天内容都不要理会。'
+CRISIS = '不想(再)?活(?!动|跃|泼|络|期|塞|性|成|出|在别人|在他人|在过去|在阴影|在回忆|在.{0,6}(眼光|期待|评价|看法))|唔想(再)?活|(?<![你他她])活(够|腻|厌)了|不活了|活(着|著)(真|也|都|好|太|还|实在)?(没|没有)(什么|啥)?(意思|意义|劲|盼头|希望)|活(着|著)(还)?有(什么|啥)(意思|意义|用)|活(着|著)(真|好|太|实在)(累|痛苦|难受)|活不下去|不想(再)?醒(来|过来)(?!这么早|太早|那么早|得这么早)|想(要)?(去)?死(?!你|您|我了|他了|她了|磕|心|守|扛|撑|记|定|机|海|角|胡同|鬼|党|对头|活|咗你)|想(要)?(去)?4(了|掉|$)|(?<![脑机器统件序戏号色车它])死了(算了|就好了)|不如死了|死咗(佢)?算|自杀|自鲨|紫砂(?!壶|锅|杯|茶|泥|陶|器|盆|煲|色)|轻生|寻死|自尽|自我了断|了断自己|了结(自己|生命|此生|残生)|(想|要|干脆|不如|只想|真想|准备|打算|决定|死了)(去)?一了百了|结束(自己|我)的(生命|性命)|结束(生命|性命)|结束(掉)?自己(?=$|[了吧啊吗呢。！!？?，,…\\s])|(想|要|准备|打算|干脆|只想|决定)(去)?结束(掉)?(这一切|一切|这条命|我的命)(?!.{0,8}(加班|工作|会议|社交|软件|应用|app|使用|订阅|项目|合作|活动|比赛|课程|任务|账号|联系))|想(要)?(彻底)?消失(?!一会|一下|一天|几天|一阵|片刻|半天|一周|一个?(星期|月|礼拜))|(从|在)这个世界(上)?消失(?!一会|一下|一天|几天|一阵|片刻|半天|一周|一个?(星期|月|礼拜))|离开这个世界|不想(再)?存在(?!感)|伤害自己|自残|割(手)?腕|割脉|割静脉|跳楼(?!价|大甩卖|甩卖|式|机)|跳河|跳桥|跳江|跳海|(楼|天台|阳台|桥|窗|屋顶|楼顶).{0,6}跳下去|上吊(?!着)|烧炭(?!取暖|火锅|烤|炉|盆)|服毒|喝农药|吃老鼠药|(准备|攒|囤|买)(好|了|够)?(了)?.{0,4}安眠药|(吞|吃|喝|服)(下|掉|了)?(一整瓶|整瓶|一整盒|整盒|一大把|一把|一大堆|大量|全部|所有|几十(片|颗|粒)|一整板)(的)?[^，,。！!？?；;吃喝吞服]{0,4}药|(吞|吃|喝|服)(下|掉|了)?(很多|好多|一堆)(的)?(安眠药|安定|镇静剂|抗抑郁药|药片)|把.{0,4}药(片|丸)?(全|都|全部)(吃|吞|喝|服)(了|掉|下|光)|(想|要|打算|准备|干脆)(去)?开煤气(?!做|烧|煮|炒|热|灶)|想(要)?(彻底|得到)?解脱(?!出来)|死にたい|消えたい|自殺したい|죽고\\s?싶|자살'
+CRISIS_EN = "\\b(kill(ing)?\\s?my\\s?self|suicid(e|al)|unalive|end(ing)? (it all|my life|my own life)|end everything|(take|taking) my (own )?life|(don'?t|do not|no longer) (want to|wanna) (live|be alive|exist)(?! in| at| with| on| near| like| here| there| alone| together| abroad| overseas| far| without| by| for| under| next)|(don'?t|do not|no longer) (want to|wanna) be here(?! at| in| for| with| when| during| tonight| tomorrow| early| late| on (time|monday|tuesday|wednesday|thursday|friday|saturday|sunday)| this (weekend|week|meeting|party|class|job))|(don'?t|do not|no longer) (want to|wanna) wake up(?! early| at| in| before| late| so early| for| to| with)|want to die|wanna die|wish i (was|were) dead|better off dead|hurt(ing)? myself(?! (playing|while|when|at|during|in|on|lifting|running|skiing|cooking|working|falling|by accident|accidentally|doing|trying|moving|carrying|exercising|training))|cut(ting)? myself(?! (while|when|shaving|cooking|on|chopping|slicing|opening|in the kitchen|by accident|accidentally|doing|making|preparing|at work))|self[- ]?harm|hang(ing)? myself|overdos(e|ed|ing) on|(took|take|taking) an overdose|no reason to live|not worth living|no point (in )?(living|being alive|going on)|no point to (live|living)|can'?t go on(?=\\s*($|[.,!;?…]|anymore|any more|any longer|like this|living|with (life|my life|this life)))|(want to|wanna) disappear(?! into| for| to| from| on| under| in| with| at| behind| off| until| till| during)|(want to|wanna|going to|gonna|i'?ll|i will|about to|ready to|plan to|planning to) end it(?! with| for| between| here with| now with| early| at)|(want to|wanna|gonna|going to|'ll|will|about to|should|might|literally|lowkey|ima|imma|just|i) kms|^kms)\\b"
+CRISIS_COMPACT = 'suicid(e|al)'
+ASK_ZH = '(把|将)[^，,。！!？?；;]{0,12}(密码|验证码|校验码|动态码|短信码|登录码|开机码|解锁码|锁屏码|口令|密钥|安全码|银行卡号|卡号|身份证号|助记词|私钥|cvv|cvc|\\bpin\\b( ?码)?)[^，,。！!？?；;]{0,8}(发|告诉|给|报|念|说|打|贴|填|输入|私信|回复|复制|粘贴)[^，,。！!？?；;]{0,4}(我|这里|这儿|这边|聊天|对话框|下面|下方|此处|一下|出来|过来)|请[^，,。！!？?；;]{0,10}(输入|填写|填入|填一下|提供|告诉我|发给我|发我|报给我|念给我|回复|私信|贴|粘贴)[^，,。！!？?；;]{0,16}(密码|验证码|校验码|动态码|短信码|登录码|开机码|解锁码|锁屏码|口令|密钥|安全码|银行卡号|卡号|身份证号|助记词|私钥|cvv|cvc|\\bpin\\b( ?码)?)|(密码|验证码|校验码|动态码|短信码|登录码|开机码|解锁码|锁屏码|口令|密钥|安全码|银行卡号|卡号|身份证号|助记词|私钥|cvv|cvc|\\bpin\\b( ?码)?)[^，,。！!？?；;]{0,6}(发|告诉|给|报|念|说|打|贴|填|输入|私信|回复)[^，,。！!？?；;]{0,3}(我|这里|这儿|这边|聊天|对话框|下面|下方|此处|一下|出来)|你的[^，,。！!？?；;]{0,8}(密码|验证码|校验码|动态码|短信码|登录码|开机码|解锁码|锁屏码|口令|密钥|安全码|银行卡号|卡号|身份证号|助记词|私钥|cvv|cvc|\\bpin\\b( ?码)?)是(多少|什么|啥)'
+ASK_EN = "\\b(tell|send|give|share|text|dm|read)\\b (it )?(to )?(me|us)\\b[^.,;!?]{0,20}\\b(password|passcode|passphrase|pin( code| number)?|verification code|one[- ]?time (pass)?code|otp|2fa code|security code|login code|sms code|access code|credentials|login details|cvv|cvc|card number|card details|recovery (phrase|key|code)|seed phrase|private key)\\b|\\b(type|enter|paste|provide|input|submit|share|send|give|tell|confirm|reply with)\\b (me |us )?(in |out )?(your|ur|the) ([a-z0-9'’-]+ ){0,3}?\\b(password|passcode|passphrase|pin( code| number)?|verification code|one[- ]?time (pass)?code|otp|2fa code|security code|login code|sms code|access code|credentials|login details|cvv|cvc|card number|card details|recovery (phrase|key|code)|seed phrase|private key)\\b|\\b(what'?s|what is|can i (have|get)|i need|i'?ll need|may i have|send over) (your|ur) ([a-z0-9'’-]+ ){0,3}?\\b(password|passcode|passphrase|pin( code| number)?|verification code|one[- ]?time (pass)?code|otp|2fa code|security code|login code|sms code|access code|credentials|login details|cvv|cvc|card number|card details|recovery (phrase|key|code)|seed phrase|private key)\\b"
+ELSEWHERE = '系统设置|设置里|设置中|偏好设置|登录界面|登录页|锁屏界面|路由器|官网|网页上|浏览器里|应用里|app里|钥匙串|\\b(open|go to|in|on|under|via|from) (the )?(system settings|settings|system preferences|login screen|lock screen|router|website|keychain|browser|app store)\\b|\\bto (reset|change|set|create|update|recover)\\b'
+NEGATED = "别|不要|千万|切勿|不能|不可以|绝不|绝对不|不会|永远不|从不|不必|无需|不用|勿|\\b(never|don'?t|dont|do not|not|no one|nobody|anyone|anybody|shouldn'?t|should not|won'?t)\\b"
+REASSURE = "(别|不要|不用|不必|无需)(担心|害怕|紧张|着急|急|慌|怕)|\\b(don'?t|do not|no need to) (worry|panic|be afraid|be scared)\\b"

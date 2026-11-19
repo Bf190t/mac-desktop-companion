@@ -15,11 +15,63 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import wave
 
 child = None
-SANDBOX = ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)']
+# Same profile as app/Sources/WorkerSandbox.swift (a test checks they match): no network, no programs other
+# than the helper's own Python runtime, no opening apps or links, no Apple events.
+SANDBOX_PROFILE = ('(version 1)(allow default)(deny network*)(deny lsopen)(deny appleevent-send)'
+                   '(deny mach-lookup (global-name "com.apple.coreservices.launchservicesd") (global-name-prefix "com.apple.lsd.")'
+                   ' (global-name "com.apple.pasteboard.1") (global-name-prefix "com.apple.backgroundtaskmanagement")'
+                   ' (global-name-prefix "com.apple.coreservices.sharedfilelistd") (global-name "com.apple.dock.server")'
+                   ' (global-name "com.apple.securityd.xpc") (global-name "com.apple.SecurityServer"))'
+                   '(deny signal)(allow signal (target same-sandbox))'
+                   '(deny process-exec*)(allow process-exec (subpath (param "RUNTIME")))'
+                   '(deny device-microphone)(deny device-camera)(deny user-preference-write)'
+                   '(deny file-write*)(allow file-write* (subpath (param "USERDIR")) (literal "/dev/null") (literal "/dev/zero")'
+                   ' (literal "/dev/dtracehelper") (subpath "/dev/fd"))')
+HELPER_FOLDER = 'desktop-companion-helpers'   # same as WorkerSandbox.helperFolderName
+
+
+def user_directory():
+    """The helper's own owner-only folder inside this user's private temporary folder (…/T/desktop-companion-helpers),
+    the only place it may write besides a few /dev nodes, and its TMPDIR. Not T itself (installer downloads, the
+    single-instance lock) and not T's parent (other apps' caches in C/, system data in 0/). Mirrors WorkerSandbox."""
+    import ctypes
+    buffer = ctypes.create_string_buffer(1024)
+    length = ctypes.CDLL(None).confstr(65537, buffer, len(buffer))   # _CS_DARWIN_USER_TEMP_DIR
+    temp = buffer.value.decode() if 0 < length <= len(buffer) else tempfile.gettempdir()
+    folder = Path(os.path.realpath(temp)) / HELPER_FOLDER
+    try:
+        os.mkdir(folder, 0o700)
+    except FileExistsError:
+        pass
+    try:
+        fd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)   # never follow a planted link
+    except OSError:
+        return folder
+    try:
+        info = os.fstat(fd)
+        if info.st_uid == os.getuid() and info.st_mode & 0o077:
+            os.fchmod(fd, 0o700)
+    finally:
+        os.close(fd)
+    return folder
+
+
+def helper_environment():
+    """Environment for the sandboxed voice helper, like WorkerSandbox.environment(): nothing inherited."""
+    return {'PATH': '/usr/bin:/bin', 'HOME': os.path.expanduser('~'), 'TMPDIR': f'{user_directory()}/', 'HF_HUB_OFFLINE': '1',
+            'TRANSFORMERS_OFFLINE': '1', 'HF_HUB_DISABLE_TELEMETRY': '1', 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONUNBUFFERED': '1'}
+
+
+def sandboxed(python):
+    """sandbox-exec command that runs `python` (a Path) under SANDBOX_PROFILE."""
+    runtime = Path(os.path.realpath(python)).parent.parent
+    return ['/usr/bin/sandbox-exec', '-D', f'RUNTIME={runtime}', '-D', f'USERDIR={user_directory()}',
+            '-p', SANDBOX_PROFILE, str(python)]
 ENGLISH = ['midnight', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven']
 
 
@@ -88,13 +140,17 @@ def chime_texts():
     return texts
 
 
-def record_chimes(stage, resources):
-    """Runs the real voice helper once (network denied) and writes one WAV per chime."""
-    worker = [*SANDBOX, str(stage / 'python-base/bin/python3.12'), '-I', '-B', '-u', str(resources / 'tts_worker.py'),
-              '--deps', str(stage / 'deps'), '--model-path', str(stage / 'model'),
+def record_chimes(stage, resources, runtime=None):
+    """Runs the real voice helper once (sandboxed: no network, no other programs) and writes one WAV per
+    chime into stage/voices/chimes, cloning stage/voices/companion_voice.wav. The Python runtime, packages and
+    model come from `runtime` (default: the stage itself; an existing installation when switching voice)."""
+    runtime = runtime or stage
+    worker = [*sandboxed(runtime / 'python-base/bin/python3.12'), '-I', '-B', '-u', str(resources / 'tts_worker.py'),
+              '--deps', str(runtime / 'deps'), '--model-path', str(runtime / 'model'),
               '--voice-ref', str(stage / 'voices/companion_voice.wav')]
     global child
-    child = subprocess.Popen(worker, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr, start_new_session=True)
+    child = subprocess.Popen(worker, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr, start_new_session=True,
+                             env=helper_environment())
     watchdog = threading.Timer(900, lambda: os.killpg(child.pid, signal.SIGKILL))
     watchdog.start()
     pending = list(chime_texts().items())
@@ -172,7 +228,7 @@ def install(stage, resources):
         target = model / name
         target.parent.mkdir(parents=True, exist_ok=True)
         url = f"https://huggingface.co/{manifest['repo']}/resolve/{manifest['revision']}/{name}?download=true"
-        run(['/usr/bin/curl', '--fail', '--location', '--proto', '=https', '--proto-redir', '=https',
+        run(['/usr/bin/curl', '-q', '--max-filesize', str(entry['bytes']), '--fail', '--location', '--proto', '=https', '--proto-redir', '=https',
              '--silent', '--show-error', '--connect-timeout', '30', '--max-time', '1800', '--retry', '2',
              url, '-o', str(target)])
         if target.stat().st_size != entry['bytes'] or digest(target) != entry['sha256']:
@@ -197,8 +253,127 @@ def install(stage, resources):
     print(json.dumps({'progress': .99, 'phase': 'verified'}), flush=True)
 
 
+RENAME_SWAP = 0x00000002    # <stdio.h> flag for renamex_np(2): exchange the two paths atomically
+
+
+def swap_paths(first, second):
+    """Exchanges two directory entries in one step with macOS renamex_np(RENAME_SWAP). Both names
+    exist at every instant, so a kill or power loss leaves either the old or the new arrangement,
+    never a missing folder. Raises OSError (ENOTSUP when the system or file system cannot swap)."""
+    import ctypes
+    import errno
+    try:
+        renamex = ctypes.CDLL(None, use_errno=True).renamex_np
+    except (AttributeError, OSError):
+        raise OSError(errno.ENOTSUP, 'renamex_np is not available') from None
+    renamex.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+    renamex.restype = ctypes.c_int
+    if renamex(os.fsencode(first), os.fsencode(second), RENAME_SWAP) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), str(first), None, str(second))
+
+
+def recover_interrupted_switch(root, expected_sha):
+    """Undoes what an interrupted earlier switch can have left. Before swap_paths (and where
+    swapping is unsupported) voices/ was renamed into the staging folder first; a kill between the
+    two renames left no voices/ at all. Put that previous folder back (preferring the one that
+    matches installation.json), then remove staging leftovers. Symbolic links are never followed."""
+    voices = root / 'voices'
+    leftovers = sorted(p for p in root.glob('.voice-switch.*') if p.is_dir() and not p.is_symlink())
+    if not os.path.lexists(voices):
+        candidates = [p / 'previous-voices' for p in leftovers
+                      if (p / 'previous-voices').is_dir() and not (p / 'previous-voices').is_symlink()
+                      and (p / 'previous-voices/companion_voice.wav').is_file()]
+        candidates.sort(key=lambda p: digest(p / 'companion_voice.wav') != expected_sha)
+        if candidates:
+            os.rename(candidates[0], voices)
+    for leftover in root.glob('.voice-switch.*'):
+        shutil.rmtree(leftover, ignore_errors=True)     # refuses symbolic links; they stay
+
+
+def switch_voice(root, resources, recorder=None):
+    """Moves an existing installation to the voice sample bundled with this app, without
+    downloading anything. Allowed only when the model revision, locked packages and Python runtime
+    are exactly the ones this app installs (true from 0.2.0 to 0.2.1): then only the sample and the
+    chimes recorded with it differ. The chimes are re-recorded with the installed model (network
+    denied) into a staging folder; voices/ is swapped and installation.json rewritten only after
+    that succeeded, so the app never pairs the new marker with the old sample. The swap is one
+    atomic step (swap_paths); if the marker cannot be written the folders are swapped back. A run
+    interrupted by an older version is repaired first (recover_interrupted_switch). Returns False
+    when nothing needed switching."""
+    root = root.resolve(strict=True)
+    resources = resources.resolve(strict=True)
+    marker = json.loads((root / 'installation.json').read_text())
+    manifest = json.loads((resources / 'model-manifest.json').read_text())
+    runtime_sha = json.loads((resources / 'runtime-manifest.json').read_text())['sha256']
+    if (marker.get('schema') != 1 or marker.get('kind') != 'voice'
+            or marker.get('model_revision') != manifest['revision']
+            or marker.get('requirements_sha256') != digest(resources / 'requirements-lock.txt')
+            or marker.get('runtime_sha256') != runtime_sha):
+        raise RuntimeError('This installation differs from this app beyond the voice; remove it and install again')
+    sample = digest(resources / 'companion_voice.wav')
+    if json.loads((resources / 'companion_voice.json').read_text()).get('sha256') != sample:
+        raise RuntimeError('The bundled voice sample does not match its description')
+    recover_interrupted_switch(root, marker.get('voice_sha256'))
+    installed = root / 'voices/companion_voice.wav'
+    if marker.get('voice_sha256') == sample and installed.is_file() and digest(installed) == sample:
+        return False
+    stage = Path(tempfile.mkdtemp(prefix='.voice-switch.', dir=root))
+    try:
+        (stage / 'voices').mkdir()
+        for filename in ['companion_voice.wav', 'companion_voice.json']:
+            shutil.copyfile(resources / filename, stage / 'voices' / filename)
+        print(json.dumps({'progress': .1, 'phase': 'chimes'}), flush=True)
+        (recorder or record_chimes)(stage, resources, runtime=root)
+        if digest(stage / 'voices/companion_voice.wav') != sample:
+            raise RuntimeError('The staged voice sample changed while recording')
+        # Commit. Cancelling cannot interrupt it halfway (SIGTERM waits until it is done); SIGKILL
+        # or power loss can, so every step leaves a voices/ folder in place.
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM, signal.SIGINT})
+        try:
+            current, new = root / 'voices', stage / 'voices'
+            if not os.path.lexists(current):
+                os.rename(new, current)                      # nothing to keep: just move it in
+                undo = lambda: os.rename(current, new)
+            else:
+                try:
+                    swap_paths(new, current)                 # atomic: old or new, never neither
+                    undo = lambda: swap_paths(new, current)
+                except OSError as error:
+                    import errno
+                    if error.errno not in (errno.ENOTSUP, errno.EINVAL, errno.ENOSYS, errno.EXDEV):
+                        raise
+                    # No atomic swap here (another file system): two renames; a run that is
+                    # killed between them is repaired by recover_interrupted_switch() next time.
+                    os.rename(current, stage / 'previous-voices')
+                    try:
+                        os.rename(new, current)
+                    except OSError:
+                        os.rename(stage / 'previous-voices', current)
+                        raise
+                    undo = lambda: (os.rename(current, new), os.rename(stage / 'previous-voices', current))
+            marker['voice_sha256'] = sample
+            temporary = root / '.installation.json.tmp'
+            try:
+                temporary.write_text(json.dumps(marker, indent=2) + '\n')
+                os.replace(temporary, root / 'installation.json')
+            except BaseException:
+                undo()                                       # the folder must match the marker again
+                temporary.unlink(missing_ok=True)
+                raise
+        finally:
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM, signal.SIGINT})
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+    print(json.dumps({'progress': .99, 'phase': 'verified'}), flush=True)
+    return True
+
+
 if __name__ == '__main__':
     try:
+        if len(sys.argv) == 4 and sys.argv[1] == '--switch-voice':
+            switch_voice(Path(sys.argv[2]), Path(sys.argv[3]))
+            raise SystemExit(0)
         if len(sys.argv) != 3:
             raise RuntimeError('Expected staging and resource directories')
         install(Path(sys.argv[1]), Path(sys.argv[2]))

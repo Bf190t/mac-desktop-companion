@@ -15,8 +15,16 @@ class BoundaryTests(unittest.TestCase):
         aliases = {'allow': None, 'status': boundary.STATUS_REPLY, 'bluetooth': boundary.BLUETOOTH_REPLY,
                    'action': boundary.ACTION_REPLY, 'unfinished': boundary.UNFINISHED_REPLY, 'long': boundary.LONG_REPLY,
                    'identity':boundary.IDENTITY_REPLY,'model':boundary.MODEL_REPLY,'capability':boundary.CAPABILITY_REPLY,
-                   'prompt':boundary.PROMPT_REPLY,'text_input':boundary.TEXT_INPUT_REPLY,'weather':boundary.WEATHER_REPLY,'clock':boundary.CLOCK_REPLY}
+                   'prompt':boundary.PROMPT_REPLY,'text_input':boundary.TEXT_INPUT_REPLY,'weather':boundary.WEATHER_REPLY,'clock':boundary.CLOCK_REPLY,'password':boundary.PASSWORD_REPLY}
         for case in cases:
+            if case['stage'] == 'crisis':
+                with self.subTest(case=case['id']):
+                    self.assertEqual(boundary.needs_crisis_support(case['input']), case['expected'] == 'support')
+                continue
+            if case['stage'] == 'reply':
+                with self.subTest(case=case['id']):
+                    self.assertEqual(boundary.sanitize_reply(case['input']) == boundary.PASSWORD_REPLY, case['expected'] == 'password')
+                continue
             with self.subTest(case=case['id']):
                 expected = aliases.get(case['expected'], case['expected'])
                 actual = boundary.reply_before_inference(case['input']) if case['stage'] == 'pre' else boundary.sanitize_reply(case['input'])

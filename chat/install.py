@@ -81,7 +81,7 @@ def install(stage, resources):
         print(json.dumps({'progress': .2 + .75 * completed / total, 'phase': 'model', 'file': name}), flush=True)
         target = model / name
         url = f"https://huggingface.co/{manifest['repo']}/resolve/{manifest['revision']}/{name}?download=true"
-        run(['/usr/bin/curl', '--fail', '--location', '--proto', '=https', '--proto-redir', '=https',
+        run(['/usr/bin/curl', '-q', '--max-filesize', str(entry['bytes']), '--fail', '--location', '--proto', '=https', '--proto-redir', '=https',
              '--silent', '--show-error', '--connect-timeout', '30', '--max-time', '1800', '--retry', '2',
              url, '-o', str(target)])
         if target.stat().st_size != entry['bytes'] or digest(target) != entry['sha256']:

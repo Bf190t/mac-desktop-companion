@@ -18,8 +18,20 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # Private terms come from a repository secret (one per line). Without it (for example on pull
+      # requests from forks) the audits still run every generic rule.
       - name: Audit public source
+        env:
+          RELEASE_DENY_TERMS: ${{ secrets.RELEASE_DENY_TERMS }}
         run: python3 scripts/audit_release.py --mode source .
+      - name: Audit git history
+        if: matrix.os == 'macos-26'
+        env:
+          RELEASE_DENY_TERMS: ${{ secrets.RELEASE_DENY_TERMS }}
+        run: python3 scripts/audit_release.py --mode history .
       - name: Build lightweight application
         run: ./scripts/build.sh
       - name: Headless regression tests
@@ -32,7 +44,12 @@ jobs:
       - name: Package
         run: ./scripts/package.sh
       - name: Audit distribution archive
-        run: python3 scripts/audit_release.py --mode zip dist/Desktop-Companion-0.2.1-AppleSilicon.zip
+        env:
+          RELEASE_DENY_TERMS: ${{ secrets.RELEASE_DENY_TERMS }}
+        run: |
+          set -- dist/Desktop-Companion-*-AppleSilicon.zip
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "Expected exactly one release archive, found: $*" >&2; exit 1; }
+          python3 scripts/audit_release.py --mode zip "$1"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Desktop-Companion-${{ matrix.os }}
@@ -49,7 +66,17 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - run: ./scripts/build.sh && ./scripts/package.sh
+      # The archive uploaded here is rebuilt in this job, so it is audited again before upload.
+      - name: Audit rebuilt archive
+        env:
+          RELEASE_DENY_TERMS: ${{ secrets.RELEASE_DENY_TERMS }}
+        run: |
+          set -- dist/Desktop-Companion-*-AppleSilicon.zip
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "Expected exactly one release archive, found: $*" >&2; exit 1; }
+          python3 scripts/audit_release.py --mode zip "$1"
       - name: Upload verified package
         env:
           GH_TOKEN: ${{ github.token }}
