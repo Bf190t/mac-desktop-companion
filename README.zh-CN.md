@@ -2,6 +2,8 @@
 
 <img src="docs/mochi.png" width="160" alt="原创桌面伙伴小团">
 
+> **安全公告（2026 年 11 月）：** 0.2.2 之前的版本有安全问题，0.2.2 已修好；Git 历史也改写过（标签换了指向）。请更新。[改了什么、为什么](docs/SECURITY_NOTICE_2026-11.zh-CN.md)
+
 简体中文 · [English](README.md)
 
 一个使用 Swift 和 AppKit 制作的轻量 macOS 桌宠。自带原创角色「小团」，提供直观的电脑状态和 Apple 蓝牙配件电量小窗。不装模型也能使用桌宠及监控功能，无需账号或 Python。

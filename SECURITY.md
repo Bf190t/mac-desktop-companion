@@ -8,6 +8,10 @@ This separation is not a complete security boundary against every local attack. 
 
 Experimental speech input requests microphone and Speech permissions only when used. An unavailable on-device recognizer is treated as unavailable; there is no intentional cloud-recognition fallback. System voices and operating-system privacy behavior are controlled by macOS.
 
+## Advisories
+
+- **November 2026** — 0.2.2 fixes a helper-sandbox escape, chat-template injection, crisis-line truncation and several low-severity issues in earlier versions (which versions each one affects is listed in the notice); the Git history was rewritten and the tags moved. See the [security notice](docs/SECURITY_NOTICE_2026-11.md) ([简体中文](docs/SECURITY_NOTICE_2026-11.zh-CN.md)). The review was done with the open-source [app-security-review](https://github.com/Bf190t/app-security-review) skill, which you can also use on your own apps.
+
 ## Reporting
 
 For an ordinary bug, use the repository's Issues page. Include the app version, macOS version, broad chip family, reproduction steps, and a sanitized screenshot only if needed.

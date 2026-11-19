@@ -2,6 +2,8 @@
 
 <img src="docs/mochi.png" width="160" alt="Mochi, the original desktop companion">
 
+> **Security notice (November 2026):** versions before 0.2.2 have security problems that 0.2.2 fixes, and the Git history was rewritten (tags moved). Please update. [What changed and why](docs/SECURITY_NOTICE_2026-11.md)
+
 [简体中文](README.zh-CN.md) · English
 
 A small native macOS desktop companion with a friendly original mascot, readable system information, and Apple Bluetooth accessory battery levels. Built with Swift and AppKit. The app works without an account, Python, or an AI model.

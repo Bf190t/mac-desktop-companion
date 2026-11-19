@@ -4,6 +4,8 @@
 
 A security review release. Nothing changes in how the companion looks or chats.
 
+Earlier versions are affected (the notice lists which versions each problem affects); please update. Their downloads were taken off the Releases page, and the Git history was rewritten to remove the 0.2.0 reference voice sample, so every earlier commit has a new ID and the tags `v0.1.0`, `v0.2.0` and `v0.2.1` moved. See the [security notice](docs/SECURITY_NOTICE_2026-11.md) for the old and new commit IDs and how to update a clone.
+
 ### Security and privacy
 - The local chat and reading-voice helpers run in a stricter sandbox. Besides having no network access, they can no longer start other programs, ask macOS to open apps or links, send Apple events, use the microphone or camera, change any app's preferences or use the pasteboard, or write anywhere except their own folder inside your private temporary folder (which is also their TMPDIR): with network denial alone, code inside a helper could start `/usr/bin/open` and let an app outside the sandbox go online, or leave a file that runs later. The reading-voice helper no longer inherits the app's environment variables.
 - Chat-template control tokens (such as `<|im_start|>` or `<think>`) in messages, the persona and "What I remember about you" are neutralised, so pasted text cannot fake a system or assistant turn. The local chat worker does the same with its tokenizer's special-token list.
